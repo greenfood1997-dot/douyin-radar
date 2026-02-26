@@ -1725,31 +1725,33 @@ function normalizeAweme(raw, track) {
 // ── 真实数据获取：通过 Claude API 搜索抖音热门视频 ─────────────────
 // 原理：调用 Anthropic API，让 AI 联网搜索抖音真实热门视频，返回结构化数据
 // 优点：无 CORS 问题，file:// 可用，不需要 TikHub 账户
-// ── TikHub 真实数据（需 HTTP 环境，非 file://）──────────────────
+// ── TikHub 数据（通过本站 /api/tikhub 中转，无 CORS 问题）──────────
 async function fetchViaTikHub(keyword) {
   const key = localStorage.getItem('tikhub_key') || localStorage.getItem('ds_key') || _dsKey;
   if (!key) return null;
-  const headers = { 'Authorization': 'Bearer ' + key, 'Accept': 'application/json' };
+
   const endpoints = [
-    'https://api.tikhub.io/api/v1/douyin/web/fetch_video_search_result?keyword=' + encodeURIComponent(keyword) + '&offset=0&count=20&sort_type=1&publish_time=1',
-    'https://api.tikhub.io/api/v1/douyin/web/fetch_hot_video?count=20',
-    'https://api.tikhub.io/api/v1/douyin/app/v3/fetch_search_video?keyword=' + encodeURIComponent(keyword) + '&cursor=0&count=20&sort_type=1',
+    `/api/tikhub?keyword=${encodeURIComponent(keyword)}&token=${encodeURIComponent(key)}`,
+    `/api/tikhub?endpoint=hot&token=${encodeURIComponent(key)}`,
   ];
+
   for (const url of endpoints) {
     try {
       const controller = new AbortController();
       setTimeout(() => controller.abort(), 12000);
-      const r = await fetch(url, { headers, signal: controller.signal });
-      if (r.status === 401) throw new Error('TikHub Key 无效（401）');
-      if (r.status === 403) throw new Error('权限不足（403）');
+      const r = await fetch(url, { signal: controller.signal });
       if (!r.ok) continue;
       const j = await r.json();
-      if (j?.code && j.code !== 200 && j.code !== 0) continue;
-      const list = j?.data?.data || j?.data?.aweme_list || j?.data?.video_list || (Array.isArray(j?.data) ? j.data : null);
+      console.log('[TikHub proxy] code:', j?.code, 'data keys:', Object.keys(j?.data||{}));
+      if (j?.code && j.code !== 200 && j.code !== 0) {
+        if (j.code === 401) throw new Error('TikHub Key 无效（401）');
+        continue;
+      }
+      const list = j?.data?.data || j?.data?.aweme_list || j?.data?.video_list || (Array.isArray(j?.data)?j.data:null);
       if (list?.length > 0) { console.log('[TikHub] ✅', list.length, 'videos'); return list; }
     } catch(e) {
-      if (e.name === 'AbortError') continue;
-      if (e.message.includes('无效') || e.message.includes('权限')) throw e;
+      if (e.name==='AbortError') continue;
+      if (e.message.includes('无效')) throw e;
       console.warn('[TikHub]', e.message);
     }
   }
@@ -1759,6 +1761,8 @@ async function fetchViaTikHub(keyword) {
 async function fetchViaRapidApi(keyword) {
   return await fetchViaTikHub(keyword);
 }
+
+
 
 
 
@@ -1924,7 +1928,7 @@ function _refreshDsBadges() {
     <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;">
       <div>
         <div style="font-size:16px;font-weight:800;color:#111827;">🔌 接入真实抖音数据</div>
-        <div style="font-size:11px;color:#9ca3af;margin-top:3px;">填入 TikHub Key → 上传 Vercel → 获取真实数据</div>
+        <div style="font-size:11px;color:#9ca3af;margin-top:3px;">填入 TikHub Key → 连接测试 → 获取真实抖音数据</div>
       </div>
       <button onclick="document.getElementById('dsModal').style.display='none'" style="background:none;border:none;color:#9ca3af;cursor:pointer;font-size:22px;">✕</button>
     </div>

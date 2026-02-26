@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/api/tikhub", "destination": "/api/tikhub" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}

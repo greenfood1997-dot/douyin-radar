@@ -1,7 +1,1 @@
-{
-  "functions": {
-    "api/tikhub.js": {
-      "runtime": "edge"
-    }
-  }
-}
+{}

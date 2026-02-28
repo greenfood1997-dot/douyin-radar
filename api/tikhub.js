@@ -12,8 +12,8 @@ const CORS = {
 function ok(data) {
   return new Response(JSON.stringify({ success: true, ...data }), { status: 200, headers: CORS });
 }
-function err(msg, status = 400, detail = null) {
-  return new Response(JSON.stringify({ success: false, error: msg, detail }), { status, headers: CORS });
+function err(msg, status = 400) {
+  return new Response(JSON.stringify({ success: false, error: msg }), { status, headers: CORS });
 }
 
 export default async function handler(req) {
@@ -37,25 +37,13 @@ export default async function handler(req) {
     if (endpoint === 'hot_search') {
       const res = await fetch(`${BASE}/api/v1/douyin/app/v3/fetch_hot_search_list`, { headers: authHeaders });
       const json = await res.json();
-
-      if (json?.code !== 200) {
-        return err(json?.message_zh || json?.message || 'TikHub API 返回错误', 502,
-          { tikhub_code: json?.code, raw: JSON.stringify(json).slice(0, 300) });
-      }
-
-      const dataData = json?.data?.data;
-      const list = Array.isArray(dataData)
-        ? dataData
-        : dataData?.sentence_list || dataData?.word_list || dataData?.hot_list
-          || json?.data?.word_list || [];
+      const list = json?.data?.data;
 
       if (!list || list.length === 0) {
         return ok({
           type: 'hot_search', title: '抖音热搜榜',
           updateTime: new Date().toLocaleString('zh-CN'), items: [],
-          _debug: { dataDataType: typeof dataData, isArray: Array.isArray(dataData),
-            keys: dataData && typeof dataData==='object' ? Object.keys(dataData) : [],
-            sample: JSON.stringify(dataData).slice(0,500) },
+          _debug: JSON.stringify(json?.data || {}).slice(0, 400),
         });
       }
 
@@ -73,32 +61,56 @@ export default async function handler(req) {
     }
 
     // ════════════════════════════════════════
-    // 关键词搜索视频 —— 只传必要参数
+    // 关键词搜索视频 - 多接口fallback
     // ════════════════════════════════════════
     else if (endpoint === 'search') {
       if (!keyword) return err('请提供 keyword 参数');
 
       const kw = encodeURIComponent(keyword);
-      // 只传 keyword 和 count，去掉所有可能引起400的可选参数
-      const url = `${BASE}/api/v1/douyin/app/v3/fetch_video_search_result?keyword=${kw}&count=20`;
-      const res = await fetch(url, { headers: authHeaders });
-      const json = await res.json();
 
-      if (json?.code !== 200) {
-        return err(json?.message_zh || json?.message || 'TikHub API 返回错误', 502,
-          { tikhub_code: json?.code, raw: JSON.stringify(json).slice(0, 600) });
+      // 依次尝试多个接口
+      const searchUrls = [
+        `${BASE}/api/v1/douyin/app/v3/fetch_search_result?keyword=${kw}&count=20`,
+        `${BASE}/api/v1/douyin/app/v3/fetch_video_search_result?keyword=${kw}&count=20`,
+        `${BASE}/api/v1/douyin/app/v2/fetch_search_result?keyword=${kw}&count=20`,
+        `${BASE}/api/v1/douyin/web/fetch_video_search_result?keyword=${kw}&count=20&offset=0`,
+      ];
+
+      let json = null;
+      let usedUrl = '';
+      for (const url of searchUrls) {
+        try {
+          const r = await fetch(url, { headers: authHeaders });
+          const j = await r.json();
+          if (j?.code === 200) { json = j; usedUrl = url; break; }
+        } catch(e) { continue; }
+      }
+
+      if (!json) {
+        return ok({
+          type: 'search', keyword,
+          title: `"${keyword}" 搜索结果`,
+          updateTime: new Date().toLocaleString('zh-CN'),
+          items: [],
+          _debug: 'all search endpoints failed'
+        });
       }
 
       const list = json?.data?.aweme_list || json?.data?.data || [];
 
       if (!list || list.length === 0) {
-        return ok({ type: 'search', keyword, title: `"${keyword}" 搜索结果`,
-          updateTime: new Date().toLocaleString('zh-CN'), items: [],
-          _debug: JSON.stringify(json?.data || {}).slice(0, 400) });
+        return ok({
+          type: 'search', keyword,
+          title: `"${keyword}" 搜索结果`,
+          updateTime: new Date().toLocaleString('zh-CN'),
+          items: [],
+          _debug: JSON.stringify(json?.data || {}).slice(0, 400),
+        });
       }
 
       return ok({
-        type: 'search', keyword, title: `"${keyword}" 搜索结果`,
+        type: 'search', keyword,
+        title: `"${keyword}" 搜索结果`,
         updateTime: new Date().toLocaleString('zh-CN'),
         items: list.map(item => {
           const v = item.aweme_info || item;
@@ -127,15 +139,8 @@ export default async function handler(req) {
       const uid = encodeURIComponent(uniqueId);
       const res = await fetch(`${BASE}/api/v1/douyin/app/v3/fetch_user_info?unique_id=${uid}`, { headers: authHeaders });
       const json = await res.json();
-
-      if (json?.code !== 200) {
-        return err(json?.message_zh || json?.message || 'TikHub API 返回错误', 502,
-          { tikhub_code: json?.code, raw: JSON.stringify(json).slice(0, 300) });
-      }
-
       const u = json?.data?.user || json?.data || {};
       if (!u.nickname && !u.uid) return err('未找到该用户');
-
       return ok({
         type: 'user_info', title: '达人信息',
         updateTime: new Date().toLocaleString('zh-CN'),
@@ -161,22 +166,13 @@ export default async function handler(req) {
     else if (endpoint === 'debug') {
       const res = await fetch(`${BASE}/api/v1/douyin/app/v3/fetch_hot_search_list`, { headers: authHeaders });
       const json = await res.json();
-      const dataData = json?.data?.data;
-      const isArray = Array.isArray(dataData);
-      const subKeys = (!isArray && dataData && typeof dataData==='object') ? Object.keys(dataData) : [];
-      const subListField = subKeys.find(k => Array.isArray(dataData[k]));
-      const list = isArray ? dataData : (subListField ? dataData[subListField] : null);
-
+      const list = json?.data?.data;
       return ok({
         type: 'debug', httpStatus: res.status,
-        tikhubCode: json?.code, tikhubMessage: json?.message_zh || json?.message,
-        topKeys: Object.keys(json || {}), dataKeys: Object.keys(json?.data || {}),
-        dataData_isArray: isArray, dataData_type: typeof dataData,
-        dataData_subKeys: subKeys,
-        dataData_detectedListField: subListField || (isArray ? '(itself)' : 'none'),
+        tikhubCode: json?.code,
+        dataKeys: Object.keys(json?.data || {}),
         listLength: list?.length || 0,
-        firstItem: list?.[0] ? JSON.stringify(list[0]).slice(0,400) : 'empty',
-        rawDataSample: JSON.stringify(json?.data || {}).slice(0,800),
+        firstItem: list?.[0] ? JSON.stringify(list[0]).slice(0, 300) : 'empty',
       });
     }
 
@@ -186,7 +182,7 @@ export default async function handler(req) {
 
   } catch (e) {
     return new Response(
-      JSON.stringify({ success: false, error: '服务器错误', detail: e.message, stack: e.stack?.slice(0,300) }),
+      JSON.stringify({ success: false, error: '服务器错误', detail: e.message }),
       { status: 500, headers: CORS }
     );
   }

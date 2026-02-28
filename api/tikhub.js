@@ -12,8 +12,8 @@ const CORS = {
 function ok(data) {
   return new Response(JSON.stringify({ success: true, ...data }), { status: 200, headers: CORS });
 }
-function err(msg, status = 400) {
-  return new Response(JSON.stringify({ success: false, error: msg }), { status, headers: CORS });
+function err(msg, status = 400, detail = null) {
+  return new Response(JSON.stringify({ success: false, error: msg, detail }), { status, headers: CORS });
 }
 
 export default async function handler(req) {
@@ -38,8 +38,21 @@ export default async function handler(req) {
       const res = await fetch(`${BASE}/api/v1/douyin/app/v3/fetch_hot_search_list`, { headers: authHeaders });
       const json = await res.json();
 
-      // V3 结构: json.data.data = 热搜列表
-      const list = json?.data?.data;
+      // ⚠️ 检查 TikHub 是否返回业务错误
+      if (json?.code !== 200) {
+        return err(
+          json?.message_zh || json?.message || 'TikHub API 返回错误',
+          502,
+          { tikhub_code: json?.code, raw: JSON.stringify(json).slice(0, 300) }
+        );
+      }
+
+      // ✅ 兼容多种可能的列表字段名
+      const list = json?.data?.word_list
+        || json?.data?.data
+        || json?.data?.sentence_list
+        || json?.data?.hot_list
+        || [];
 
       if (!list || list.length === 0) {
         return ok({
@@ -78,8 +91,15 @@ export default async function handler(req) {
       );
       const json = await res.json();
 
-      // V3 搜索结构: json.data.data = 视频列表
-      const list = json?.data?.data || json?.data?.aweme_list || [];
+      if (json?.code !== 200) {
+        return err(
+          json?.message_zh || json?.message || 'TikHub API 返回错误',
+          502,
+          { tikhub_code: json?.code, raw: JSON.stringify(json).slice(0, 300) }
+        );
+      }
+
+      const list = json?.data?.aweme_list || json?.data?.data || [];
 
       if (!list || list.length === 0) {
         return ok({
@@ -123,8 +143,18 @@ export default async function handler(req) {
       const uid = encodeURIComponent(uniqueId);
       const res = await fetch(`${BASE}/api/v1/douyin/app/v3/fetch_user_info?unique_id=${uid}`, { headers: authHeaders });
       const json = await res.json();
+
+      if (json?.code !== 200) {
+        return err(
+          json?.message_zh || json?.message || 'TikHub API 返回错误',
+          502,
+          { tikhub_code: json?.code, raw: JSON.stringify(json).slice(0, 300) }
+        );
+      }
+
       const u = json?.data?.user || json?.data || {};
       if (!u.nickname && !u.uid) return err('未找到该用户');
+
       return ok({
         type: 'user_info',
         title: '达人信息',
@@ -146,19 +176,26 @@ export default async function handler(req) {
     }
 
     // ════════════════════════════════════════
-    // 诊断接口
+    // 诊断接口 —— 自动探测数据结构，方便排查
     // ════════════════════════════════════════
     else if (endpoint === 'debug') {
       const res = await fetch(`${BASE}/api/v1/douyin/app/v3/fetch_hot_search_list`, { headers: authHeaders });
       const json = await res.json();
-      const list = json?.data?.data;
+      const dataKeys = Object.keys(json?.data || {});
+      const listField = dataKeys.find(k => Array.isArray(json.data[k]));
+      const list = listField ? json.data[listField] : null;
+
       return ok({
         type: 'debug',
         httpStatus: res.status,
+        tikhubCode: json?.code,
+        tikhubMessage: json?.message_zh || json?.message,
         topKeys: Object.keys(json || {}),
-        dataKeys: Object.keys(json?.data || {}),
+        dataKeys,
+        detectedListField: listField || 'none',     // ← 告诉你列表在哪个字段
         listLength: list?.length || 0,
-        firstItem: list?.[0] ? JSON.stringify(list[0]).slice(0, 300) : 'empty',
+        firstItem: list?.[0] ? JSON.stringify(list[0]).slice(0, 400) : 'empty',
+        rawDataSample: JSON.stringify(json?.data || {}).slice(0, 600),
       });
     }
 
@@ -168,7 +205,7 @@ export default async function handler(req) {
 
   } catch (e) {
     return new Response(
-      JSON.stringify({ success: false, error: '服务器错误', detail: e.message }),
+      JSON.stringify({ success: false, error: '服务器错误', detail: e.message, stack: e.stack?.slice(0, 300) }),
       { status: 500, headers: CORS }
     );
   }

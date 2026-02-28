@@ -16,26 +16,6 @@ function err(msg, status = 400) {
   return new Response(JSON.stringify({ success: false, error: msg }), { status, headers: CORS });
 }
 
-// 从 V3 响应中提取列表（穷举所有可能字段）
-function extractList(json) {
-  if (!json) return null;
-  const d = json.data || json;
-  // 热搜相关字段
-  const list =
-    d.word_list || d.sentence_list || d.hot_list || d.hotList ||
-    d.data || d.list || d.items || d.result || d.trending ||
-    d.hot_search_list || d.hotSearchList ||
-    (Array.isArray(d) ? d : null);
-  return list && list.length > 0 ? list : null;
-}
-
-// 从单条热搜条目提取词语
-function extractWord(item) {
-  return item.word || item.sentence || item.hot_value_desc ||
-         item.title || item.name || item.query || item.text ||
-         item.keyword || item.content || JSON.stringify(item).slice(0, 40);
-}
-
 export default async function handler(req) {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
 
@@ -51,26 +31,23 @@ export default async function handler(req) {
 
   try {
 
-    // ════════════════════════════════════════════════
-    // 热搜榜
-    // ════════════════════════════════════════════════
+    // ════════════════════════════════════════
+    // 抖音热搜榜
+    // ════════════════════════════════════════
     if (endpoint === 'hot_search') {
       const res = await fetch(`${BASE}/api/v1/douyin/app/v3/fetch_hot_search_list`, { headers: authHeaders });
       const json = await res.json();
 
-      // 把完整 data 结构暴露出来方便调试
-      const rawData = json?.data || json;
-      const list = extractList(json);
+      // V3 结构: json.data.data = 热搜列表
+      const list = json?.data?.data;
 
-      if (!list) {
-        // 返回原始结构供前端调试
+      if (!list || list.length === 0) {
         return ok({
           type: 'hot_search',
           title: '抖音热搜榜',
           updateTime: new Date().toLocaleString('zh-CN'),
           items: [],
-          _rawKeys: Object.keys(rawData || {}),
-          _rawSample: JSON.stringify(rawData).slice(0, 800),
+          _debug: JSON.stringify(json?.data || {}).slice(0, 400),
         });
       }
 
@@ -80,17 +57,17 @@ export default async function handler(req) {
         updateTime: new Date().toLocaleString('zh-CN'),
         items: list.map((item, idx) => ({
           rank: idx + 1,
-          word: extractWord(item),
-          hotValue: item.hot_value || item.event_count || item.hot_score || item.score || item.view_count || 0,
+          word: item.word || item.sentence || item.hot_value_desc || item.title || item.name || item.query || '',
+          hotValue: item.hot_value || item.event_count || item.hot_score || item.score || 0,
           label: item.label_name || item.sentence_label || item.label || item.tag || '',
-          coverUrl: item.cover_url || item.cover?.url_list?.[0] || item.image || '',
+          coverUrl: item.cover_url || item.cover?.url_list?.[0] || '',
         })),
       });
     }
 
-    // ════════════════════════════════════════════════
+    // ════════════════════════════════════════
     // 关键词搜索视频
-    // ════════════════════════════════════════════════
+    // ════════════════════════════════════════
     else if (endpoint === 'search') {
       if (!keyword) return err('请提供 keyword 参数');
 
@@ -100,17 +77,17 @@ export default async function handler(req) {
         { headers: authHeaders }
       );
       const json = await res.json();
-      const rawData = json?.data || json;
-      const list = extractList(json);
 
-      if (!list) {
+      // V3 搜索结构: json.data.data = 视频列表
+      const list = json?.data?.data || json?.data?.aweme_list || [];
+
+      if (!list || list.length === 0) {
         return ok({
           type: 'search', keyword,
           title: `"${keyword}" 搜索结果`,
           updateTime: new Date().toLocaleString('zh-CN'),
           items: [],
-          _rawKeys: Object.keys(rawData || {}),
-          _rawSample: JSON.stringify(rawData).slice(0, 800),
+          _debug: JSON.stringify(json?.data || {}).slice(0, 400),
         });
       }
 
@@ -138,9 +115,9 @@ export default async function handler(req) {
       });
     }
 
-    // ════════════════════════════════════════════════
+    // ════════════════════════════════════════
     // 达人信息
-    // ════════════════════════════════════════════════
+    // ════════════════════════════════════════
     else if (endpoint === 'user_info') {
       if (!uniqueId) return err('请提供 unique_id 参数（抖音号）');
       const uid = encodeURIComponent(uniqueId);
@@ -149,7 +126,8 @@ export default async function handler(req) {
       const u = json?.data?.user || json?.data || {};
       if (!u.nickname && !u.uid) return err('未找到该用户');
       return ok({
-        type: 'user_info', title: '达人信息',
+        type: 'user_info',
+        title: '达人信息',
         updateTime: new Date().toLocaleString('zh-CN'),
         user: {
           nickname: u.nickname || '',
@@ -167,23 +145,25 @@ export default async function handler(req) {
       });
     }
 
-    // ════════════════════════════════════════════════
-    // 诊断接口：返回完整原始数据
-    // ════════════════════════════════════════════════
+    // ════════════════════════════════════════
+    // 诊断接口
+    // ════════════════════════════════════════
     else if (endpoint === 'debug') {
       const res = await fetch(`${BASE}/api/v1/douyin/app/v3/fetch_hot_search_list`, { headers: authHeaders });
       const json = await res.json();
+      const list = json?.data?.data;
       return ok({
         type: 'debug',
-        status: res.status,
-        topLevelKeys: Object.keys(json || {}),
+        httpStatus: res.status,
+        topKeys: Object.keys(json || {}),
         dataKeys: Object.keys(json?.data || {}),
-        fullResponse: JSON.stringify(json).slice(0, 2000),
+        listLength: list?.length || 0,
+        firstItem: list?.[0] ? JSON.stringify(list[0]).slice(0, 300) : 'empty',
       });
     }
 
     else {
-      return err(`未知 endpoint: ${endpoint}。可用: hot_search, search, user_info, debug`);
+      return err(`未知 endpoint: ${endpoint}`);
     }
 
   } catch (e) {

@@ -43,40 +43,28 @@ export default async function handler(req) {
           { tikhub_code: json?.code, raw: JSON.stringify(json).slice(0, 300) });
       }
 
-      // data.data 是嵌套对象，热搜列表在更深层
-      // 结构: json.data.data.sentence_list 或 json.data.data (数组)
       const dataData = json?.data?.data;
       const list = Array.isArray(dataData)
-        ? dataData                                        // data.data 本身就是数组
-        : dataData?.sentence_list                         // data.data.sentence_list
-          || dataData?.word_list                          // data.data.word_list
-          || dataData?.hot_list                           // data.data.hot_list
-          || json?.data?.word_list                        // data.word_list (备用)
-          || [];
+        ? dataData
+        : dataData?.sentence_list || dataData?.word_list || dataData?.hot_list
+          || json?.data?.word_list || [];
 
       if (!list || list.length === 0) {
         return ok({
-          type: 'hot_search',
-          title: '抖音热搜榜',
-          updateTime: new Date().toLocaleString('zh-CN'),
-          items: [],
-          // 把完整的 data.data 结构暴露出来方便调试
-          _debug: {
-            dataDataType: typeof dataData,
-            dataDataIsArray: Array.isArray(dataData),
-            dataDataKeys: dataData && typeof dataData === 'object' ? Object.keys(dataData) : [],
-            sample: JSON.stringify(dataData).slice(0, 500),
-          },
+          type: 'hot_search', title: '抖音热搜榜',
+          updateTime: new Date().toLocaleString('zh-CN'), items: [],
+          _debug: { dataDataType: typeof dataData, isArray: Array.isArray(dataData),
+            keys: dataData && typeof dataData==='object' ? Object.keys(dataData) : [],
+            sample: JSON.stringify(dataData).slice(0,500) },
         });
       }
 
       return ok({
-        type: 'hot_search',
-        title: '抖音热搜榜',
+        type: 'hot_search', title: '抖音热搜榜',
         updateTime: new Date().toLocaleString('zh-CN'),
         items: list.map((item, idx) => ({
           rank: idx + 1,
-          word: item.word || item.sentence || item.hot_value_desc || item.title || item.name || item.query || '',
+          word: item.word || item.sentence || item.hot_value_desc || item.title || item.name || '',
           hotValue: item.hot_value || item.event_count || item.hot_score || item.score || 0,
           label: item.label_name || item.sentence_label || item.label || item.tag || '',
           coverUrl: item.cover_url || item.cover?.url_list?.[0] || '',
@@ -85,21 +73,19 @@ export default async function handler(req) {
     }
 
     // ════════════════════════════════════════
-    // 关键词搜索视频
+    // 关键词搜索视频 —— 去掉 search_id 空参数
     // ════════════════════════════════════════
     else if (endpoint === 'search') {
       if (!keyword) return err('请提供 keyword 参数');
 
       const kw = encodeURIComponent(keyword);
-      const res = await fetch(
-        `${BASE}/api/v1/douyin/app/v3/fetch_video_search_result?keyword=${kw}&count=20&offset=0&search_id=&sort_type=0&publish_time=0&filter_duration=0`,
-        { headers: authHeaders }
-      );
+      const url = `${BASE}/api/v1/douyin/app/v3/fetch_video_search_result?keyword=${kw}&count=20&offset=0&sort_type=0&publish_time=0&filter_duration=0`;
+      const res = await fetch(url, { headers: authHeaders });
       const json = await res.json();
 
       if (json?.code !== 200) {
         return err(json?.message_zh || json?.message || 'TikHub API 返回错误', 502,
-          { tikhub_code: json?.code, raw: JSON.stringify(json).slice(0, 300) });
+          { tikhub_code: json?.code, raw: JSON.stringify(json).slice(0, 400) });
       }
 
       const list = json?.data?.aweme_list || json?.data?.data || [];
@@ -169,33 +155,27 @@ export default async function handler(req) {
     }
 
     // ════════════════════════════════════════
-    // 诊断接口 —— 深度探测 data.data 结构
+    // 诊断接口
     // ════════════════════════════════════════
     else if (endpoint === 'debug') {
       const res = await fetch(`${BASE}/api/v1/douyin/app/v3/fetch_hot_search_list`, { headers: authHeaders });
       const json = await res.json();
-
       const dataData = json?.data?.data;
       const isArray = Array.isArray(dataData);
-      const subKeys = (!isArray && dataData && typeof dataData === 'object') ? Object.keys(dataData) : [];
+      const subKeys = (!isArray && dataData && typeof dataData==='object') ? Object.keys(dataData) : [];
       const subListField = subKeys.find(k => Array.isArray(dataData[k]));
       const list = isArray ? dataData : (subListField ? dataData[subListField] : null);
 
       return ok({
-        type: 'debug',
-        httpStatus: res.status,
-        tikhubCode: json?.code,
-        tikhubMessage: json?.message_zh || json?.message,
-        topKeys: Object.keys(json || {}),
-        dataKeys: Object.keys(json?.data || {}),
-        // 关键：data.data 的详情
-        dataData_isArray: isArray,
-        dataData_type: typeof dataData,
+        type: 'debug', httpStatus: res.status,
+        tikhubCode: json?.code, tikhubMessage: json?.message_zh || json?.message,
+        topKeys: Object.keys(json || {}), dataKeys: Object.keys(json?.data || {}),
+        dataData_isArray: isArray, dataData_type: typeof dataData,
         dataData_subKeys: subKeys,
         dataData_detectedListField: subListField || (isArray ? '(itself)' : 'none'),
         listLength: list?.length || 0,
-        firstItem: list?.[0] ? JSON.stringify(list[0]).slice(0, 400) : 'empty',
-        rawDataSample: JSON.stringify(json?.data || {}).slice(0, 800),
+        firstItem: list?.[0] ? JSON.stringify(list[0]).slice(0,400) : 'empty',
+        rawDataSample: JSON.stringify(json?.data || {}).slice(0,800),
       });
     }
 
@@ -205,7 +185,7 @@ export default async function handler(req) {
 
   } catch (e) {
     return new Response(
-      JSON.stringify({ success: false, error: '服务器错误', detail: e.message, stack: e.stack?.slice(0, 300) }),
+      JSON.stringify({ success: false, error: '服务器错误', detail: e.message, stack: e.stack?.slice(0,300) }),
       { status: 500, headers: CORS }
     );
   }

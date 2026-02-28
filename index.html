@@ -1135,21 +1135,22 @@ function generateFeedData() {
 }
 
 async function refreshFeed(isFirst) {
-  const anthropicKey = localStorage.getItem('anthropic_key') || _dsKey;
-  const hasCfg = !!(anthropicKey && anthropicKey.length > 10);
+  const tikhubKey = localStorage.getItem('tikhub_key') || localStorage.getItem('ds_key') || _dsKey;
+  const hasCfg = !!(tikhubKey && tikhubKey.length > 10);
   const list = document.getElementById('feedList');
 
   if (hasCfg) {
     if (list) list.innerHTML = `
       <div style="padding:60px 20px;text-align:center;">
         <div style="font-size:30px;animation:spin 0.8s linear infinite;display:inline-block;margin-bottom:12px;">⟳</div>
-        <div style="font-size:13px;color:#6b7280;font-weight:600;">AI 正在搜索真实热门视频…</div>
+        <div style="font-size:13px;color:#6b7280;font-weight:600;">正在获取真实抖音数据…</div>
       </div>`;
 
     try {
       const results = [];
-      const trackList = selectedTracks.length > 0 ? selectedTracks : ['美食','搞笑段子','知识科普'];
-      
+      const trackList = selectedTracks.length > 0 ? selectedTracks : ['热搜'];
+
+      // 第一步：尝试关键词搜索
       await Promise.allSettled(trackList.slice(0,4).map(async track => {
         const kws = TRACK_KEYWORDS[track] || TRACK_KEYWORDS.default;
         const kw = kws[Math.floor(Date.now()/60000) % kws.length];
@@ -1158,8 +1159,20 @@ async function refreshFeed(isFirst) {
           if (awemes?.length) {
             awemes.forEach(a => { const v = normalizeAweme(a, track); if(v) results.push(v); });
           }
-        } catch(e) { console.warn('[refreshFeed]', track, e.message); }
+        } catch(e) { console.warn('[refreshFeed search]', track, e.message); }
       }));
+
+      // 第二步：搜索无数据时回退到热搜榜
+      if (results.length === 0) {
+        console.log('[refreshFeed] 搜索无结果，回退到热搜榜');
+        try {
+          const hotItems = await fetchHotSearch();
+          if (hotItems?.length) {
+            const track = selectedTracks[0] || '热搜';
+            hotItems.forEach(a => { const v = normalizeAweme(a, track); if(v) results.push(v); });
+          }
+        } catch(e) { console.warn('[refreshFeed hotSearch]', e.message); }
+      }
 
       if (results.length > 0) {
         const seen = new Set();
@@ -1176,10 +1189,10 @@ async function refreshFeed(isFirst) {
         return;
       }
     } catch(e) {
-      console.warn('[refreshFeed] AI fetch failed:', e.message);
+      console.warn('[refreshFeed] fetch failed:', e.message);
     }
     _dsConnected = false;
-    showToast('⚠️ AI 获取失败，切换演示模式');
+    showToast('⚠️ 数据获取失败，切换演示模式');
     _refreshDsBadges();
   }
 
@@ -1188,6 +1201,22 @@ async function refreshFeed(isFirst) {
   updateMetrics();
   if(!isFirst) generateAlert();
   drawTrendChart();
+}
+
+// 直接获取热搜榜
+async function fetchHotSearch() {
+  const key = localStorage.getItem('tikhub_key') || localStorage.getItem('ds_key') || _dsKey;
+  if (!key) return null;
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), 15000);
+  const r = await fetch('/api/tikhub?endpoint=hot_search', {
+    signal: controller.signal,
+    headers: { 'x-api-key': key }
+  });
+  if (!r.ok) return null;
+  const j = await r.json();
+  if (!j?.success || !j.items?.length) return null;
+  return j.items.map(item => ({ _isHotSearch: true, desc: item.word || '', _hotValue: item.hotValue || 0 }));
 }
 
 function renderFeed(isFirst) {

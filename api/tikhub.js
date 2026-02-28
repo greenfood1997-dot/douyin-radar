@@ -73,19 +73,20 @@ export default async function handler(req) {
     }
 
     // ════════════════════════════════════════
-    // 关键词搜索视频 —— 去掉 search_id 空参数
+    // 关键词搜索视频 —— 只传必要参数
     // ════════════════════════════════════════
     else if (endpoint === 'search') {
       if (!keyword) return err('请提供 keyword 参数');
 
       const kw = encodeURIComponent(keyword);
-      const url = `${BASE}/api/v1/douyin/app/v3/fetch_video_search_result?keyword=${kw}&count=20&offset=0&sort_type=0&publish_time=0&filter_duration=0`;
+      // 只传 keyword 和 count，去掉所有可能引起400的可选参数
+      const url = `${BASE}/api/v1/douyin/app/v3/fetch_video_search_result?keyword=${kw}&count=20`;
       const res = await fetch(url, { headers: authHeaders });
       const json = await res.json();
 
       if (json?.code !== 200) {
         return err(json?.message_zh || json?.message || 'TikHub API 返回错误', 502,
-          { tikhub_code: json?.code, raw: JSON.stringify(json).slice(0, 400) });
+          { tikhub_code: json?.code, raw: JSON.stringify(json).slice(0, 600) });
       }
 
       const list = json?.data?.aweme_list || json?.data?.data || [];

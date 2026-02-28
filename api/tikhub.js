@@ -124,18 +124,19 @@ export default async function handler(req) {
       };
 
       const searchBody = { keyword, count: 20 };
-      const [r1, r2, r3] = await Promise.all([
+      const [r1, r2, r3, r4] = await Promise.all([
         tryFetch(`${BASE}/api/v1/douyin/search/fetch_video_search_v1`, 'search_v1', searchBody),
         tryFetch(`${BASE}/api/v1/douyin/search/fetch_video_search_v2`, 'search_v2', searchBody),
         tryFetch(`${BASE}/api/v1/douyin/search/fetch_general_search_v1`, 'general_v1', searchBody),
+        tryFetch(`${BASE}/api/v1/douyin/search/fetch_general_search_v2`, 'general_v2', searchBody),
       ]);
 
-      const debugLog = [r1, r2, r3].map(r => ({
+      const debugLog = [r1, r2, r3, r4].map(r => ({
         label: r.label, code: r.code, msg: r.msg, error: r.error, count: r.list.length
       }));
 
       // 取第一个有数据的结果
-      const best = [r1, r2, r3].find(r => r.list.length > 0);
+      const best = [r1, r2, r3, r4].find(r => r.list.length > 0);
 
       if (!best) {
         return ok({

@@ -1140,32 +1140,67 @@ async function refreshFeed(isFirst) {
   const list = document.getElementById('feedList');
 
   if (hasCfg) {
+    const trackList = selectedTracks.length > 0 ? selectedTracks : null;
+
     if (list) list.innerHTML = `
       <div style="padding:60px 20px;text-align:center;">
         <div style="font-size:30px;animation:spin 0.8s linear infinite;display:inline-block;margin-bottom:12px;">⟳</div>
-        <div style="font-size:13px;color:#6b7280;font-weight:600;">正在获取真实抖音热搜…</div>
+        <div style="font-size:13px;color:#6b7280;font-weight:600;">正在搜索「${trackList ? trackList.join(' · ') : '热搜'}」赛道视频…</div>
       </div>`;
 
     try {
-      // 直接获取热搜榜（最稳定的接口）
+      let allResults = [];
+
+      if (trackList && trackList.length > 0) {
+        // ✅ 按每个赛道关键词搜索真实视频
+        for (const track of trackList) {
+          // 取该赛道第一个关键词作为搜索词（最精准）
+          const kws = TRACK_KEYWORDS[track] || [track];
+          const searchKw = kws[0];
+
+          const items = await fetchViaTikHub(searchKw);
+          if (items && items.length > 0) {
+            items.forEach(item => {
+              allResults.push({ ...item, _track: track });
+            });
+          }
+        }
+      }
+
+      // 如果赛道搜索有结果，直接用
+      if (allResults.length > 0) {
+        feedData = allResults.map(item => normalizeAweme(item, item._track)).filter(Boolean);
+        feedData.sort((a, b) => b.heat - a.heat);
+        feedData.slice(0, 3).forEach(v => { v.isNew = true; });
+        _dsConnected = true;
+        renderFeed(isFirst);
+        updateMetrics();
+        if (!isFirst) generateAlert();
+        drawTrendChart();
+        _refreshDsBadges();
+        return;
+      }
+
+      // 搜索无结果时 fallback 到热搜榜，并用关键词过滤
       const hotItems = await fetchHotSearch();
-
       if (hotItems?.length > 0) {
-        const trackList = selectedTracks.length > 0 ? selectedTracks : ['热搜'];
         const results = [];
-
         hotItems.forEach((item, idx) => {
           const word = item.word || item.desc || '';
           if (!word) return;
 
-          // 按赛道关键词匹配，给每条热搜打上对应赛道标签
-          let matchedTrack = trackList[0] || '热搜';
-          for (const track of trackList) {
-            const kws = TRACK_KEYWORDS[track] || [];
-            if (kws.some(k => word.includes(k))) {
-              matchedTrack = track;
-              break;
+          // 匹配赛道标签
+          let matchedTrack = trackList ? null : '热搜';
+          if (trackList) {
+            for (const track of trackList) {
+              const kws = TRACK_KEYWORDS[track] || [track];
+              if (kws.some(k => word.includes(k))) {
+                matchedTrack = track;
+                break;
+              }
             }
+            // 如果没有匹配到具体赛道，仍然显示但打上第一个赛道标签
+            if (!matchedTrack) matchedTrack = trackList[0];
           }
 
           results.push({

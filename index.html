@@ -1143,47 +1143,46 @@ async function refreshFeed(isFirst) {
     if (list) list.innerHTML = `
       <div style="padding:60px 20px;text-align:center;">
         <div style="font-size:30px;animation:spin 0.8s linear infinite;display:inline-block;margin-bottom:12px;">⟳</div>
-        <div style="font-size:13px;color:#6b7280;font-weight:600;">正在获取真实抖音数据…</div>
+        <div style="font-size:13px;color:#6b7280;font-weight:600;">正在获取真实抖音热搜…</div>
       </div>`;
 
     try {
-      const results = [];
-      const trackList = selectedTracks.length > 0 ? selectedTracks : ['热搜'];
+      // 直接获取热搜榜（最稳定的接口）
+      const hotItems = await fetchHotSearch();
 
-      // 第一步：尝试关键词搜索
-      await Promise.allSettled(trackList.slice(0,4).map(async track => {
-        const kws = TRACK_KEYWORDS[track] || TRACK_KEYWORDS.default;
-        const kw = kws[Math.floor(Date.now()/60000) % kws.length];
-        try {
-          const awemes = await fetchViaTikHub(kw);
-          if (awemes?.length) {
-            awemes.forEach(a => { const v = normalizeAweme(a, track); if(v) results.push(v); });
+      if (hotItems?.length > 0) {
+        const trackList = selectedTracks.length > 0 ? selectedTracks : ['热搜'];
+        const results = [];
+
+        hotItems.forEach((item, idx) => {
+          const word = item.word || item.desc || '';
+          if (!word) return;
+
+          // 按赛道关键词匹配，给每条热搜打上对应赛道标签
+          let matchedTrack = trackList[0] || '热搜';
+          for (const track of trackList) {
+            const kws = TRACK_KEYWORDS[track] || [];
+            if (kws.some(k => word.includes(k))) {
+              matchedTrack = track;
+              break;
+            }
           }
-        } catch(e) { console.warn('[refreshFeed search]', track, e.message); }
-      }));
 
-      // 第二步：搜索无数据时回退到热搜榜
-      if (results.length === 0) {
-        console.log('[refreshFeed] 搜索无结果，回退到热搜榜');
-        try {
-          const hotItems = await fetchHotSearch();
-          if (hotItems?.length) {
-            const track = selectedTracks[0] || '热搜';
-            hotItems.forEach(a => { const v = normalizeAweme(a, track); if(v) results.push(v); });
-          }
-        } catch(e) { console.warn('[refreshFeed hotSearch]', e.message); }
-      }
+          results.push({
+            _isHotSearch: true,
+            desc: word,
+            _hotValue: item.hotValue || item._hotValue || (50 - idx) * 100000,
+            _track: matchedTrack,
+          });
+        });
 
-      if (results.length > 0) {
-        const seen = new Set();
-        feedData = results
-          .filter(v => !seen.has(v.aweme_id) && seen.add(v.aweme_id))
-          .sort((a,b) => b.heat - a.heat);
-        feedData.slice(0,3).forEach(v => { v.isNew = true; });
+        feedData = results.map(item => normalizeAweme(item, item._track)).filter(Boolean);
+        feedData.sort((a, b) => b.heat - a.heat);
+        feedData.slice(0, 3).forEach(v => { v.isNew = true; });
         _dsConnected = true;
         renderFeed(isFirst);
         updateMetrics();
-        if(!isFirst) generateAlert();
+        if (!isFirst) generateAlert();
         drawTrendChart();
         _refreshDsBadges();
         return;
@@ -1216,7 +1215,7 @@ async function fetchHotSearch() {
   if (!r.ok) return null;
   const j = await r.json();
   if (!j?.success || !j.items?.length) return null;
-  return j.items.map(item => ({ _isHotSearch: true, desc: item.word || '', _hotValue: item.hotValue || 0 }));
+  return j.items.map(item => ({ word: item.word || '', hotValue: item.hotValue || 0 }));
 }
 
 function renderFeed(isFirst) {

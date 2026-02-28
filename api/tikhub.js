@@ -1,35 +1,20 @@
-export const config = { runtime: 'edge' };
+module.exports = async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  if (req.method === 'OPTIONS') return res.status(200).end();
 
-export default async function handler(req) {
-  const { searchParams } = new URL(req.url);
-  const keyword = searchParams.get('keyword') || '美食';
-  const token = searchParams.get('token');
+  const keyword = req.query.keyword || '美食';
+  const token = req.query.token;
+  if (!token) return res.status(400).json({ error: 'Missing token' });
 
-  const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Content-Type': 'application/json',
-  };
+  const url = `https://api.tikhub.io/api/v1/douyin/app/v3/fetch_search_video?keyword=${encodeURIComponent(keyword)}&cursor=0&count=20&sort_type=1`;
 
-  if (!token) return new Response(JSON.stringify({ error: 'Missing token' }), { headers });
-
-  const urls = [
-    `https://api.tikhub.io/api/v1/douyin/app/v3/fetch_search_video?keyword=${encodeURIComponent(keyword)}&cursor=0&count=20&sort_type=1&publish_time=1`,
-    `https://api.tikhub.io/api/v1/douyin/app/v3/fetch_video_feed?count=20`,
-  ];
-
-  for (const url of urls) {
-    try {
-      const r = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json',
-        }
-      });
-      const text = await r.text();
-      return new Response(text, { headers });
-    } catch(e) {
-      continue;
-    }
+  try {
+    const r = await fetch(url, {
+      headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+    });
+    const text = await r.text();
+    res.status(200).send(text);
+  } catch(e) {
+    res.status(500).json({ error: e.message });
   }
-  return new Response(JSON.stringify({ error: 'All endpoints failed' }), { headers });
 }

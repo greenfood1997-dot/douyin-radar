@@ -220,13 +220,15 @@ export default async function handler(req) {
       const results = await Promise.all(urls.map(async ({ url, label }) => {
         try {
           const r = await fetchWithTimeout(url, { headers: authHeaders }, 12000);
-          const j = await r.json();
+          const text = await r.text();
+          let j = {};
+          try { j = JSON.parse(text); } catch(e) {}
           const allKeys = Object.keys(j?.data || {});
           const listFields = {};
           for (const k of allKeys) {
-            if (Array.isArray(j.data[k])) listFields[k] = j.data[k].length;
+            if (Array.isArray(j?.data?.[k])) listFields[k] = j.data[k].length;
           }
-          return { label, httpStatus: r.status, code: j?.code, message: j?.message_zh || j?.message || '', dataKeys: allKeys, listFields };
+          return { label, httpStatus: r.status, code: j?.code, message: j?.message_zh || j?.message || '', dataKeys: allKeys, listFields, raw: text.slice(0, 200) };
         } catch(e) {
           return { label, error: e.name === 'AbortError' ? 'TIMEOUT' : e.message };
         }

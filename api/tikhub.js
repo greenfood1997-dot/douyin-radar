@@ -203,12 +203,19 @@ export default async function handler(req) {
     // 诊断接口
     // ════════════════════════════════════════
     else if (endpoint === 'debug') {
-      const kw = encodeURIComponent('美食');
+      const kw = encodeURIComponent('美妆');
       const urls = [
-        { url: `${BASE}/api/v1/douyin/web/fetch_video_search_result?keyword=${kw}&count=5&offset=0&sort_type=0&publish_time=0`, label: 'web_search' },
-        { url: `${BASE}/api/v1/douyin/app/v3/fetch_video_search_result?keyword=${kw}&count=5`, label: 'app_v3_video' },
-        { url: `${BASE}/api/v1/douyin/app/v3/fetch_search_result?keyword=${kw}&count=5`, label: 'app_v3_search' },
+        // 热搜（已知可用）
         { url: `${BASE}/api/v1/douyin/app/v3/fetch_hot_search_list`, label: 'hot_search' },
+        // douyin/search/ 系列
+        { url: `${BASE}/api/v1/douyin/search/fetch_video_search_v1?keyword=${kw}&count=10`, label: 'search_v1' },
+        { url: `${BASE}/api/v1/douyin/search/fetch_video_search_v2?keyword=${kw}&count=10`, label: 'search_v2' },
+        { url: `${BASE}/api/v1/douyin/search/fetch_general_search_v1?keyword=${kw}&count=10`, label: 'general_v1' },
+        { url: `${BASE}/api/v1/douyin/search/fetch_general_search_v2?keyword=${kw}&count=10`, label: 'general_v2' },
+        // douyin/billboard/ 系列
+        { url: `${BASE}/api/v1/douyin/billboard/fetch_hot_list`, label: 'billboard_hot' },
+        { url: `${BASE}/api/v1/douyin/billboard/fetch_video_hot_list`, label: 'billboard_video' },
+        { url: `${BASE}/api/v1/douyin/billboard/fetch_category_hot_list`, label: 'billboard_category' },
       ];
       const results = await Promise.all(urls.map(async ({ url, label }) => {
         try {

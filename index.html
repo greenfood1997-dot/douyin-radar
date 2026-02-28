@@ -878,6 +878,11 @@ header {
 let selectedTracks = [];
 let monitorInterval = null;
 let monitorRunning = false;
+// 提前声明，防止 refreshFeed 等函数在初始化前引用报错
+let _dsSource    = localStorage.getItem('ds_source') || null;
+let _dsKey       = localStorage.getItem('ds_key')    || null;
+let _dsConnected = false;
+let _dsSelectedSource = _dsSource || 'tikhub';
 let monitorCountdown = 60;
 let countdownTimer = null;
 let feedFilter = 'all';
@@ -935,6 +940,7 @@ function switchView(name, el) {
   document.getElementById('view-'+name).classList.add('active');
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
   if(el) el.classList.add('active');
+  if(name === 'track') renderTrackGrid();
 }
 
 // ============ TRACK SELECTION ============
@@ -1454,7 +1460,8 @@ function selectSource(src, el) {
     `<div class="guide-step"><div class="guide-num">${i+1}</div><span>${s}</span></div>`
   ).join('');
 }
-selectSource('feigua', document.getElementById('src-feigua'));
+const _srcFeigua = document.getElementById('src-feigua');
+if (_srcFeigua) selectSource('feigua', _srcFeigua);
 
 document.getElementById('pasteArea').addEventListener('input', function() {
   pastedData = this.value;
@@ -2152,10 +2159,11 @@ renderAccountList();
 // ═══════════════════════════════════════════════════════════════
 // v4 真实数据引擎
 // ═══════════════════════════════════════════════════════════════
-let _dsSource    = localStorage.getItem('ds_source') || null;
-let _dsKey       = localStorage.getItem('ds_key')    || null;
-let _dsConnected = false;
-let _dsSelectedSource = _dsSource || 'tikhub';
+// _ds 变量已在文件顶部声明，此处重新从 localStorage 读取最新值
+_dsSource    = localStorage.getItem('ds_source') || null;
+_dsKey       = localStorage.getItem('ds_key')    || null;
+_dsConnected = false;
+_dsSelectedSource = _dsSource || 'tikhub';
 
 const TRACK_KEYWORDS = {
   '美食':['美食','探店','做饭','料理'],

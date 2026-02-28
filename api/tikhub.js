@@ -1,6 +1,6 @@
 export const config = { runtime: 'edge' };
 
-const BASE = 'https://api.tikhub.io';
+const BASE = 'https://api.tikhub.dev';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',

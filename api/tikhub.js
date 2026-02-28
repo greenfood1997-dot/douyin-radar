@@ -196,10 +196,13 @@ export default async function handler(req) {
     // ════════════════════════════════════════
     else if (endpoint === 'debug') {
       const kw = encodeURIComponent('美食');
+      // 测试新的 Douyin-Search-API 路径
       const urls = [
-        `${BASE}/api/v1/douyin/web/fetch_general_search_result?keyword=${kw}&count=5&offset=0&search_channel=aweme_general&search_source=normal_search`,
-        `${BASE}/api/v1/douyin/web/fetch_video_search_result?keyword=${kw}&count=5&offset=0&sort_type=0&publish_time=0`,
-        `${BASE}/api/v1/douyin/app/v3/fetch_search_result?keyword=${kw}&count=5`,
+        `${BASE}/api/v1/douyin/search/fetch_video_search_v1?keyword=${kw}&count=10&offset=0`,
+        `${BASE}/api/v1/douyin/search/fetch_video_search_v2?keyword=${kw}&count=10&offset=0`,
+        `${BASE}/api/v1/douyin/search/fetch_general_search_v1?keyword=${kw}&count=10&offset=0`,
+        `${BASE}/api/v1/douyin/search/fetch_general_search_v2?keyword=${kw}&count=10&offset=0`,
+        `${BASE}/api/v1/douyin/web/fetch_video_search_result?keyword=${kw}&count=10&offset=0`,
       ];
       const results = {};
       for (const url of urls) {
@@ -209,14 +212,19 @@ export default async function handler(req) {
           const path = url.replace(BASE, '').split('?')[0];
           let j = {};
           try { j = JSON.parse(text); } catch(e) {}
-          const list = j?.data?.aweme_list || j?.data?.data || [];
+          const allKeys = Object.keys(j?.data || {});
+          // 找所有可能的列表字段
+          const listFields = {};
+          for (const k of allKeys) {
+            if (Array.isArray(j.data[k])) listFields[k] = j.data[k].length;
+          }
           results[path] = {
             httpStatus: r.status,
             code: j?.code,
             message: j?.message_zh || j?.message || '',
-            listCount: Array.isArray(list) ? list.length : typeof list,
-            dataKeys: Object.keys(j?.data || {}),
-            rawSlice: text.slice(0, 300),
+            dataKeys: allKeys,
+            listFields,
+            rawSlice: text.slice(0, 200),
           };
         } catch(e) {
           results[url.replace(BASE, '').split('?')[0]] = { error: e.message };

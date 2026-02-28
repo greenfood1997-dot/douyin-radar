@@ -16,21 +16,24 @@ function err(msg, status = 400) {
   return new Response(JSON.stringify({ success: false, error: msg }), { status, headers: CORS });
 }
 
-// 尝试多个 URL，返回第一个成功且有数据的结果
-async function tryUrls(urls, token, pick) {
-  const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
-  for (const url of urls) {
-    try {
-      const res = await fetch(url, { headers });
-      if (!res.ok) continue;
-      const json = await res.json();
-      const items = pick(json);
-      if (items && items.length > 0) return { items, _raw: json };
-    } catch (e) {
-      continue;
-    }
-  }
-  return null;
+// 从 V3 响应中提取列表（穷举所有可能字段）
+function extractList(json) {
+  if (!json) return null;
+  const d = json.data || json;
+  // 热搜相关字段
+  const list =
+    d.word_list || d.sentence_list || d.hot_list || d.hotList ||
+    d.data || d.list || d.items || d.result || d.trending ||
+    d.hot_search_list || d.hotSearchList ||
+    (Array.isArray(d) ? d : null);
+  return list && list.length > 0 ? list : null;
+}
+
+// 从单条热搜条目提取词语
+function extractWord(item) {
+  return item.word || item.sentence || item.hot_value_desc ||
+         item.title || item.name || item.query || item.text ||
+         item.keyword || item.content || JSON.stringify(item).slice(0, 40);
 }
 
 export default async function handler(req) {
@@ -44,70 +47,79 @@ export default async function handler(req) {
   const token = req.headers.get('x-api-key') || req.headers.get('authorization')?.replace('Bearer ', '');
   if (!token) return err('Missing TikHub API Key');
 
+  const authHeaders = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+
   try {
 
-    // ══════════════════════════════════════════════════════
-    // 热搜榜：多接口 fallback（优先 App V3）
-    // ══════════════════════════════════════════════════════
+    // ════════════════════════════════════════════════
+    // 热搜榜
+    // ════════════════════════════════════════════════
     if (endpoint === 'hot_search') {
-      const result = await tryUrls([
-        `${BASE}/api/v1/douyin/app/v3/fetch_hot_search_list`,
-        `${BASE}/api/v1/douyin/app/v2/fetch_hot_search_list`,
-        `${BASE}/api/v1/douyin/app/v1/fetch_hot_search_list`,
-        `${BASE}/api/v1/douyin/web/fetch_hot_search_list`,
-      ], token, (json) =>
-        json?.data?.word_list ||
-        json?.data?.sentence_list ||
-        json?.data?.data ||
-        (Array.isArray(json?.data) ? json.data : null)
-      );
+      const res = await fetch(`${BASE}/api/v1/douyin/app/v3/fetch_hot_search_list`, { headers: authHeaders });
+      const json = await res.json();
 
-      if (!result) return ok({
-        type: 'hot_search', title: '抖音热搜榜',
-        updateTime: new Date().toLocaleString('zh-CN'), items: [],
-        _debug: 'all endpoints returned empty'
-      });
+      // 把完整 data 结构暴露出来方便调试
+      const rawData = json?.data || json;
+      const list = extractList(json);
+
+      if (!list) {
+        // 返回原始结构供前端调试
+        return ok({
+          type: 'hot_search',
+          title: '抖音热搜榜',
+          updateTime: new Date().toLocaleString('zh-CN'),
+          items: [],
+          _rawKeys: Object.keys(rawData || {}),
+          _rawSample: JSON.stringify(rawData).slice(0, 800),
+        });
+      }
 
       return ok({
         type: 'hot_search',
         title: '抖音热搜榜',
         updateTime: new Date().toLocaleString('zh-CN'),
-        items: result.items.map((item, idx) => ({
+        items: list.map((item, idx) => ({
           rank: idx + 1,
-          word: item.word || item.sentence || item.hot_value_desc || item.title || item.name || '',
-          hotValue: item.hot_value || item.event_count || item.hot_score || 0,
-          label: item.label_name || item.sentence_label || item.label || '',
-          coverUrl: item.cover_url || item.cover?.url_list?.[0] || '',
+          word: extractWord(item),
+          hotValue: item.hot_value || item.event_count || item.hot_score || item.score || item.view_count || 0,
+          label: item.label_name || item.sentence_label || item.label || item.tag || '',
+          coverUrl: item.cover_url || item.cover?.url_list?.[0] || item.image || '',
         })),
       });
     }
 
-    // ══════════════════════════════════════════════════════
-    // 关键词搜索视频：多接口 fallback
-    // ══════════════════════════════════════════════════════
+    // ════════════════════════════════════════════════
+    // 关键词搜索视频
+    // ════════════════════════════════════════════════
     else if (endpoint === 'search') {
       if (!keyword) return err('请提供 keyword 参数');
 
       const kw = encodeURIComponent(keyword);
-      const result = await tryUrls([
+      const res = await fetch(
         `${BASE}/api/v1/douyin/app/v3/fetch_search_result?keyword=${kw}&count=20&offset=0&search_id=&sort_type=0&publish_time=0&filter_duration=0`,
-        `${BASE}/api/v1/douyin/app/v2/fetch_search_result?keyword=${kw}&count=20&offset=0`,
-        `${BASE}/api/v1/douyin/web/fetch_video_search_result?keyword=${kw}&count=20&offset=0&sort_type=0&publish_time=0`,
-      ], token, (json) =>
-        json?.data?.data ||
-        json?.data?.aweme_list ||
-        json?.data?.video_list ||
-        (Array.isArray(json?.data) ? json.data : null)
+        { headers: authHeaders }
       );
+      const json = await res.json();
+      const rawData = json?.data || json;
+      const list = extractList(json);
 
-      if (!result) return ok({ type: 'search', keyword, title: `"${keyword}" 搜索结果`, updateTime: new Date().toLocaleString('zh-CN'), items: [] });
+      if (!list) {
+        return ok({
+          type: 'search', keyword,
+          title: `"${keyword}" 搜索结果`,
+          updateTime: new Date().toLocaleString('zh-CN'),
+          items: [],
+          _rawKeys: Object.keys(rawData || {}),
+          _rawSample: JSON.stringify(rawData).slice(0, 800),
+        });
+      }
 
       return ok({
         type: 'search',
         keyword,
         title: `"${keyword}" 搜索结果`,
         updateTime: new Date().toLocaleString('zh-CN'),
-        items: result.items.map(item => {
+        items: list.map(item => {
           const v = item.aweme_info || item;
           const stat = v.statistics || v.stats || {};
           return {
@@ -126,27 +138,18 @@ export default async function handler(req) {
       });
     }
 
-    // ══════════════════════════════════════════════════════
+    // ════════════════════════════════════════════════
     // 达人信息
-    // ══════════════════════════════════════════════════════
+    // ════════════════════════════════════════════════
     else if (endpoint === 'user_info') {
       if (!uniqueId) return err('请提供 unique_id 参数（抖音号）');
-
       const uid = encodeURIComponent(uniqueId);
-      const result = await tryUrls([
-        `${BASE}/api/v1/douyin/app/v3/fetch_user_info?unique_id=${uid}`,
-        `${BASE}/api/v1/douyin/web/fetch_user_info?unique_id=${uid}`,
-        `${BASE}/api/v1/douyin/app/v2/fetch_user_info?unique_id=${uid}`,
-      ], token, (json) => {
-        const u = json?.data?.user || json?.data;
-        return u?.uid || u?.nickname ? [u] : null;
-      });
-
-      if (!result) return err('未找到该用户');
-      const u = result.items[0];
+      const res = await fetch(`${BASE}/api/v1/douyin/app/v3/fetch_user_info?unique_id=${uid}`, { headers: authHeaders });
+      const json = await res.json();
+      const u = json?.data?.user || json?.data || {};
+      if (!u.nickname && !u.uid) return err('未找到该用户');
       return ok({
-        type: 'user_info',
-        title: '达人信息',
+        type: 'user_info', title: '达人信息',
         updateTime: new Date().toLocaleString('zh-CN'),
         user: {
           nickname: u.nickname || '',
@@ -164,27 +167,19 @@ export default async function handler(req) {
       });
     }
 
-    // ══════════════════════════════════════════════════════
-    // 诊断接口：直接返回 TikHub 原始响应，用于排查
-    // ══════════════════════════════════════════════════════
+    // ════════════════════════════════════════════════
+    // 诊断接口：返回完整原始数据
+    // ════════════════════════════════════════════════
     else if (endpoint === 'debug') {
-      const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
-      const testUrls = [
-        `${BASE}/api/v1/douyin/app/v3/fetch_hot_search_list`,
-        `${BASE}/api/v1/douyin/app/v2/fetch_hot_search_list`,
-        `${BASE}/api/v1/douyin/web/fetch_hot_search_list`,
-      ];
-      const results = {};
-      for (const url of testUrls) {
-        try {
-          const res = await fetch(url, { headers });
-          const text = await res.text();
-          results[url.replace(BASE, '')] = { status: res.status, body: text.slice(0, 600) };
-        } catch (e) {
-          results[url.replace(BASE, '')] = { error: e.message };
-        }
-      }
-      return ok({ type: 'debug', results });
+      const res = await fetch(`${BASE}/api/v1/douyin/app/v3/fetch_hot_search_list`, { headers: authHeaders });
+      const json = await res.json();
+      return ok({
+        type: 'debug',
+        status: res.status,
+        topLevelKeys: Object.keys(json || {}),
+        dataKeys: Object.keys(json?.data || {}),
+        fullResponse: JSON.stringify(json).slice(0, 2000),
+      });
     }
 
     else {
@@ -192,6 +187,9 @@ export default async function handler(req) {
     }
 
   } catch (e) {
-    return new Response(JSON.stringify({ success: false, error: '服务器错误', detail: e.message }), { status: 500, headers: CORS });
+    return new Response(
+      JSON.stringify({ success: false, error: '服务器错误', detail: e.message }),
+      { status: 500, headers: CORS }
+    );
   }
 }

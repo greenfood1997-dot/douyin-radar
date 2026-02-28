@@ -538,7 +538,7 @@ header {
   <div class="header-center">
     <div class="nav-tab active" onclick="switchView('monitor',this)">📡 实时监测</div>
     <div class="nav-tab" onclick="switchView('track',this)">🏁 赛道选取</div>
-    <div class="nav-tab" onclick="switchView('analyze',this)">🔍 数据分析</div>
+    <div class="nav-tab" onclick="switchView('analyze',this)">💥 爆款拆解</div>
     <div class="nav-tab" onclick="switchView('report',this)">📋 分析报告</div>
   </div>
   <div class="header-right">
@@ -709,135 +709,222 @@ header {
 </div>
 </div>
 
-<!-- ========== VIEW: ANALYZE ========== -->
+<!-- ========== VIEW: ANALYZE (爆款拆解) ========== -->
 <div id="view-analyze">
 <div class="page">
-<div class="analyze-layout">
 
-  <div>
-    <!-- Wizard -->
-    <div class="step-wizard">
-      <div class="wizard-step active" id="ws1"><div class="wizard-num" id="wn1">1</div>选数据来源</div>
-      <div class="wizard-step" id="ws2"><div class="wizard-num" id="wn2">2</div>粘贴数据</div>
-      <div class="wizard-step" id="ws3"><div class="wizard-num" id="wn3">3</div>AI分析</div>
+  <!-- 爆款拆解 主标题 -->
+  <div class="section-hd" style="margin-bottom:16px;">
+    <div>
+      <div class="section-title">💥 爆款拆解工作台</div>
+      <div class="section-sub">粘贴抖音链接 → AI智能拆解结构 → 选品填充 → 一键生成脚本</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <div id="dsAiBadge" style="font-size:10px;padding:4px 12px;border-radius:20px;background:rgba(124,58,237,0.12);border:1px solid rgba(124,58,237,0.3);color:#a78bfa;font-family:'IBM Plex Mono',monospace;">
+        ⚡ DeepSeek 算力
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="openDsKeyModal()">🔑 配置DeepSeek Key</button>
+    </div>
+  </div>
+
+  <!-- 进度步骤条 -->
+  <div class="step-wizard" style="margin-bottom:20px;">
+    <div class="wizard-step active" id="ws1"><div class="wizard-num" id="wn1">1</div>粘贴抖音链接</div>
+    <div class="wizard-step" id="ws2"><div class="wizard-num" id="wn2">2</div>AI拆解结构</div>
+    <div class="wizard-step" id="ws3"><div class="wizard-num" id="wn3">3</div>选择产品</div>
+    <div class="wizard-step" id="ws4"><div class="wizard-num" id="wn4">4</div>生成脚本</div>
+  </div>
+
+  <div class="analyze-layout">
+    <!-- 左侧主工作区 -->
+    <div>
+
+      <!-- STEP 1: 输入链接 -->
+      <div id="az-step1">
+        <div class="card" style="margin-bottom:14px;">
+          <div class="card-hd">
+            <div class="card-title">🔗 粘贴抖音爆款链接</div>
+            <span class="tag blue">支持视频分享链接</span>
+          </div>
+          <div class="card-body">
+            <div style="background:rgba(0,212,255,0.05);border:1px solid rgba(0,212,255,0.15);border-radius:8px;padding:10px 14px;font-size:11px;color:var(--accent2);margin-bottom:14px;line-height:1.8;">
+              📱 打开抖音，找到你想拆解的爆款视频，点击「分享」→「复制链接」，粘贴到下方
+            </div>
+            <div style="display:flex;gap:10px;align-items:flex-start;">
+              <input type="text" id="douyinUrlInput"
+                placeholder="https://v.douyin.com/xxxxx/ 或完整链接..."
+                style="flex:1;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;padding:12px 16px;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:13px;outline:none;transition:border-color 0.2s;"
+                onfocus="this.style.borderColor='var(--accent2)'" onblur="this.style.borderColor='var(--border)'"
+              />
+              <button class="btn btn-red" onclick="startBreakdown()" style="padding:12px 24px;white-space:nowrap;">
+                🚀 AI拆解
+              </button>
+            </div>
+            <div style="margin-top:10px;display:flex;gap:8px;align-items:center;">
+              <span style="font-size:11px;color:var(--muted);">或直接粘贴视频标题/描述文字：</span>
+            </div>
+            <textarea id="douyinTextInput" class="paste-area" style="min-height:100px;margin-top:8px;"
+              placeholder="也可以直接把视频标题、文案、评论区爆款评论等文字粘贴进来，AI会自动分析爆款结构..."></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 2: 拆解结果 -->
+      <div id="az-step2" style="display:none;">
+        <div class="card" style="margin-bottom:14px;">
+          <div class="card-hd">
+            <div class="card-title">🧬 爆款结构拆解报告</div>
+            <div style="display:flex;gap:8px;">
+              <button class="btn btn-ghost btn-sm" onclick="backToStep1()">← 重新输入</button>
+              <button class="btn btn-red btn-sm" onclick="copyStructure()">📋 一键复刻结构</button>
+            </div>
+          </div>
+          <div id="breakdownResult" class="card-body" style="font-size:13px;line-height:1.9;"></div>
+        </div>
+
+        <!-- 爆款结构可视化卡片 -->
+        <div id="structureCards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-bottom:14px;"></div>
+
+        <div style="text-align:center;margin-bottom:6px;">
+          <button class="btn btn-red" onclick="goToProductSelect()" style="padding:12px 36px;font-size:14px;">
+            🛍️ 下一步：选择我的产品 →
+          </button>
+        </div>
+      </div>
+
+      <!-- STEP 3: 选品 -->
+      <div id="az-step3" style="display:none;">
+        <div class="card" style="margin-bottom:14px;">
+          <div class="card-hd">
+            <div class="card-title">🛍️ 选择你的产品</div>
+            <button class="btn btn-ghost btn-sm" onclick="backToStep2()">← 返回拆解结果</button>
+          </div>
+          <div class="card-body">
+            <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">基于爆款结构，AI会搜索此产品的核心卖点，并自动填充到脚本框架中</div>
+            <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;">
+              <input type="text" id="productInput"
+                placeholder="输入产品名称，如：乳酸菌面膜、空气炸锅、植物蛋白奶..."
+                style="flex:1;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;padding:11px 14px;color:var(--text);font-family:'Noto Sans SC',sans-serif;font-size:13px;outline:none;transition:border-color 0.2s;"
+                onfocus="this.style.borderColor='var(--accent2)'" onblur="this.style.borderColor='var(--border)'"
+              />
+              <button class="btn btn-red" onclick="searchProductSellPoints()" style="white-space:nowrap;padding:11px 20px;">
+                🔍 搜索卖点
+              </button>
+            </div>
+
+            <!-- 快捷选品标签 -->
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">
+              <span style="font-size:11px;color:var(--muted);">快速选择：</span>
+              <span class="qtag" onclick="quickProduct('防晒霜')">防晒霜</span>
+              <span class="qtag" onclick="quickProduct('洗发水')">洗发水</span>
+              <span class="qtag" onclick="quickProduct('面膜')">面膜</span>
+              <span class="qtag" onclick="quickProduct('减肥茶')">减肥茶</span>
+              <span class="qtag" onclick="quickProduct('空气炸锅')">空气炸锅</span>
+              <span class="qtag" onclick="quickProduct('蓝牙耳机')">蓝牙耳机</span>
+              <span class="qtag" onclick="quickProduct('运动内衣')">运动内衣</span>
+              <span class="qtag" onclick="quickProduct('儿童零食')">儿童零食</span>
+            </div>
+
+            <!-- 产品卖点展示 -->
+            <div id="productSellPoints" style="display:none;">
+              <div style="font-size:11px;color:var(--accent2);font-family:'IBM Plex Mono',monospace;letter-spacing:1px;margin-bottom:10px;">▸ AI 全网搜索到的核心卖点</div>
+              <div id="sellPointsList"></div>
+              <div style="margin-top:16px;text-align:center;">
+                <button class="btn btn-red" onclick="generateScript()" style="padding:12px 40px;font-size:14px;">
+                  ✨ 一键生成脚本 →
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 4: 脚本输出 -->
+      <div id="az-step4" style="display:none;">
+        <div class="card">
+          <div class="card-hd">
+            <div class="card-title">📝 爆款视频脚本</div>
+            <div style="display:flex;gap:8px;">
+              <button class="btn btn-ghost btn-sm" onclick="backToStep3()">← 更换产品</button>
+              <button class="btn btn-ghost btn-sm" onclick="copyScript()">📋 复制脚本</button>
+              <button class="btn btn-ghost btn-sm" onclick="exportReport()">⬇ 下载</button>
+              <button class="btn btn-red btn-sm" onclick="saveReport()">💾 保存</button>
+            </div>
+          </div>
+          <div id="scriptOutput" class="card-body" style="font-size:13px;line-height:2;"></div>
+        </div>
+      </div>
+
     </div>
 
-    <!-- Step 1: Source -->
-    <div id="az-step1">
-      <div class="section-label">选择数据来源平台</div>
-      <div class="source-grid">
-        <div class="source-card active" id="src-feigua" onclick="selectSource('feigua',this)">
-          <div class="source-icon">🥒</div>
-          <div class="source-name">飞瓜数据</div>
-          <div class="source-desc">综合排行·免费版可用</div>
-        </div>
-        <div class="source-card" id="src-chanmama" onclick="selectSource('chanmama',this)">
-          <div class="source-icon">🦗</div>
-          <div class="source-name">蝉妈妈</div>
-          <div class="source-desc">带货电商·数据丰富</div>
-        </div>
-        <div class="source-card" id="src-huitun" onclick="selectSource('huitun',this)">
-          <div class="source-icon">🐷</div>
-          <div class="source-name">灰豚数据</div>
-          <div class="source-desc">性价比高·小白友好</div>
-        </div>
-        <div class="source-card" id="src-official" onclick="selectSource('official',this)">
-          <div class="source-icon">📊</div>
-          <div class="source-name">巨量算数</div>
-          <div class="source-desc">官方免费·数据权威</div>
-        </div>
-        <div class="source-card" id="src-manual" onclick="selectSource('manual',this)">
-          <div class="source-icon">✏️</div>
-          <div class="source-name">手动整理</div>
-          <div class="source-desc">自己看到的直接输入</div>
-        </div>
-        <div class="source-card" id="src-other" onclick="selectSource('other',this)">
-          <div class="source-icon">🔗</div>
-          <div class="source-name">其他来源</div>
-          <div class="source-desc">截图文字·随意粘贴</div>
-        </div>
-      </div>
-      <div class="guide-box" id="guideBox">
-        <div class="guide-title" id="guideTitle"></div>
-        <div id="guideSteps"></div>
-      </div>
-      <div style="margin-top:16px;">
-        <button class="btn btn-red" onclick="azGoto(2)">下一步：粘贴数据 →</button>
-      </div>
-    </div>
-
-    <!-- Step 2: Paste -->
-    <div id="az-step2" style="display:none;">
-      <div class="section-label">粘贴数据</div>
-      <div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:6px;padding:10px 14px;font-size:12px;color:var(--gold);margin-bottom:12px;">
-        ⚡ 不需要格式整齐，随便粘贴！AI会自动识别标题、点赞、评论等信息。
-      </div>
-      <textarea class="paste-area" id="pasteArea" placeholder="把从飞瓜/蝉妈妈/巨量算数复制的内容粘贴到这里...
-
-支持各种格式，例如：
-▶ 视频标题 点赞10.2万 评论3400 分享2.1万
-▶ 一行一个视频也行
-▶ 截图文字、网页文字都可以
-▶ 甚至只是你手打的标题和大概数据"></textarea>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:11px;color:var(--muted);">
-        <span id="charCount">0 字符</span>
-        <span>粘贴后点击分析</span>
-      </div>
-      <div style="display:flex;gap:10px;margin-top:14px;align-items:center;">
-        <button class="btn btn-ghost" onclick="azGoto(1)">← 上一步</button>
-        <button class="btn btn-red" onclick="startAnalysis()" style="padding:10px 28px;">🚀 开始AI分析</button>
-        <span style="font-size:11px;color:var(--muted);">约10-20秒</span>
-      </div>
-    </div>
-
-    <!-- Step 3: Result -->
-    <div id="az-step3" style="display:none;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+    <!-- 右侧 AI 侧边栏 -->
+    <div class="ai-sidebar">
+      <div class="ai-hd">
         <div>
-          <div style="font-size:15px;font-weight:700;">📊 分析报告</div>
-          <div style="font-size:11px;color:var(--muted);margin-top:2px;">赛道：<span id="rptTrack" style="color:var(--accent2)"></span> · 来源：<span id="rptSource"></span></div>
+          <div class="ai-title">🤖 DeepSeek AI 助手</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:2px;">爆款拆解 · 随时提问</div>
         </div>
-        <div style="display:flex;gap:8px;">
-          <button class="btn btn-ghost btn-sm" onclick="azGoto(2)">重新粘贴</button>
-          <button class="btn btn-ghost btn-sm" onclick="exportReport()">⬇ 导出</button>
-          <button class="btn btn-red btn-sm" onclick="saveReport()">💾 保存报告</button>
+        <button class="btn btn-ghost btn-sm" onclick="clearChat()">清空</button>
+      </div>
+      <div class="ai-chat" id="aiChat">
+        <div class="empty">
+          <div class="empty-icon">💥</div>
+          <div class="empty-text">粘贴链接后<br>AI自动开始拆解</div>
         </div>
       </div>
-      <div id="reportContent"></div>
+      <div class="quick-tags">
+        <span class="qtag" onclick="quickAsk('这个爆款的情绪钩子是什么？')">情绪钩子</span>
+        <span class="qtag" onclick="quickAsk('帮我优化开头3秒的黄金钩子')">优化开头</span>
+        <span class="qtag" onclick="quickAsk('这个结构适合哪些产品类目？')">适合品类</span>
+        <span class="qtag" onclick="quickAsk('帮我写3个不同风格的爆款标题')">爆款标题</span>
+        <span class="qtag" onclick="quickAsk('这个视频的评论区互动策略是什么？')">互动策略</span>
+        <span class="qtag" onclick="quickAsk('基于现有结构，给我10个选题方向')">选题方向</span>
+      </div>
+      <div class="chat-bottom">
+        <textarea class="chat-input" id="chatInput" placeholder="问AI任何问题..." onkeydown="handleKey(event)"></textarea>
+        <button class="send-btn" onclick="sendMsg()">➤</button>
+      </div>
     </div>
   </div>
 
-  <!-- AI Sidebar -->
-  <div class="ai-sidebar">
-    <div class="ai-hd">
+</div>
+</div>
+
+<!-- DeepSeek Key 配置弹窗 -->
+<div id="dsKeyModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:9999;align-items:center;justify-content:center;backdrop-filter:blur(8px);">
+  <div style="background:#fff;border-radius:18px;padding:28px;width:92%;max-width:480px;box-shadow:0 24px 60px rgba(0,0,0,0.25);">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;">
       <div>
-        <div class="ai-title">🤖 AI 分析师</div>
-        <div style="font-size:10px;color:var(--muted);margin-top:2px;">随时提问 · 深度拆解</div>
+        <div style="font-size:16px;font-weight:800;color:#111827;">⚡ 配置 DeepSeek API</div>
+        <div style="font-size:11px;color:#9ca3af;margin-top:3px;">接入 DeepSeek 开放平台算力，驱动爆款拆解功能</div>
       </div>
-      <button class="btn btn-ghost btn-sm" onclick="clearChat()">清空</button>
+      <button onclick="document.getElementById('dsKeyModal').style.display='none'" style="background:none;border:none;color:#9ca3af;cursor:pointer;font-size:22px;">✕</button>
     </div>
-    <div class="ai-chat" id="aiChat">
-      <div class="empty">
-        <div class="empty-icon">💬</div>
-        <div class="empty-text">完成左侧步骤<br>AI自动开始分析</div>
-      </div>
+    <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:11px;color:#0369a1;line-height:1.8;">
+      <strong>获取步骤：</strong><br>
+      1. 打开 <a href="https://platform.deepseek.com/api_keys" target="_blank" style="color:#0ea5e9;font-weight:600;">platform.deepseek.com</a> → API Keys<br>
+      2. 点击「创建 API Key」→ 复制（<code style="background:#e0f2fe;padding:1px 4px;border-radius:3px;">sk-...</code> 开头）<br>
+      3. 粘贴到下方输入框
     </div>
-    <div class="quick-tags">
-      <span class="qtag" onclick="quickAsk('这个赛道最近什么内容容易爆？')">爆款规律</span>
-      <span class="qtag" onclick="quickAsk('给我3个可以立刻拍的爆款选题，越具体越好')">立刻能拍的选题</span>
-      <span class="qtag" onclick="quickAsk('这类视频的标题公式是什么？')">标题公式</span>
-      <span class="qtag" onclick="quickAsk('帮我写一个完整的视频脚本框架')">脚本框架</span>
-      <span class="qtag" onclick="quickAsk('分析一下竞争对手的共同点')">竞品分析</span>
-      <span class="qtag" onclick="quickAsk('预测未来1-2周这个赛道的趋势')">趋势预测</span>
+    <div style="margin-bottom:14px;">
+      <div style="font-size:11px;color:#374151;font-weight:700;margin-bottom:6px;">DeepSeek API Key</div>
+      <input id="deepseekKeyInput" type="password" placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        style="width:100%;background:#f9fafb;border:1.5px solid #e5e7eb;border-radius:8px;padding:11px 14px;font-family:monospace;font-size:12px;color:#111827;outline:none;box-sizing:border-box;"
+        onfocus="this.style.borderColor='#7c3aed'" onblur="this.style.borderColor='#e5e7eb'"
+      />
     </div>
-    <div class="chat-bottom">
-      <textarea class="chat-input" id="chatInput" placeholder="问任何问题..." onkeydown="handleKey(event)"></textarea>
-      <button class="send-btn" onclick="sendMsg()">➤</button>
+    <div id="dsKeyError" style="display:none;font-size:11px;padding:8px 12px;border-radius:6px;margin-bottom:10px;color:#991b1b;background:#fef2f2;border:1px solid #fecaca;"></div>
+    <div id="dsKeySuccess" style="display:none;font-size:11px;padding:8px 12px;border-radius:6px;margin-bottom:10px;color:#166534;background:#f0fdf4;border:1px solid #bbf7d0;"></div>
+    <div style="display:flex;gap:8px;">
+      <button onclick="saveDeepseekKey()" style="flex:1;padding:12px;background:#7c3aed;border:none;border-radius:9px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;">
+        ✅ 保存并启用
+      </button>
+      <button onclick="clearDeepseekKey()" style="padding:12px 16px;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:9px;color:#6b7280;font-size:12px;cursor:pointer;">
+        清除
+      </button>
     </div>
+    <div style="font-size:10px;color:#9ca3af;margin-top:10px;text-align:center;">Key 仅存在你的浏览器本地，不上传任何服务器</div>
   </div>
-
-</div>
-</div>
 </div>
 
 <!-- ========== VIEW: REPORT ========== -->
@@ -1404,133 +1491,421 @@ function drawTrendChart() {
   ctx.fill();
 }
 
-// ============ ANALYZE ============
+// ============ DEEPSEEK KEY MANAGEMENT ============
+function openDsKeyModal() {
+  const m = document.getElementById('dsKeyModal');
+  if (!m) return;
+  const inp = document.getElementById('deepseekKeyInput');
+  if (inp) { const saved = localStorage.getItem('deepseek_key') || ''; if (saved) inp.value = saved; }
+  m.style.display = 'flex';
+}
+function saveDeepseekKey() {
+  const key = document.getElementById('deepseekKeyInput')?.value?.trim();
+  const err = document.getElementById('dsKeyError');
+  const suc = document.getElementById('dsKeySuccess');
+  if (!key || key.length < 10) { err.style.display='block'; err.textContent='请输入有效的 DeepSeek API Key'; return; }
+  localStorage.setItem('deepseek_key', key);
+  err.style.display = 'none';
+  suc.style.display = 'block'; suc.textContent = '✅ Key 已保存，DeepSeek算力已激活！';
+  setTimeout(() => document.getElementById('dsKeyModal').style.display='none', 1200);
+  showToast('⚡ DeepSeek AI 已激活！');
+}
+function clearDeepseekKey() {
+  localStorage.removeItem('deepseek_key');
+  const inp = document.getElementById('deepseekKeyInput');
+  if (inp) inp.value = '';
+  const suc = document.getElementById('dsKeySuccess');
+  if (suc) { suc.style.display='block'; suc.textContent='Key已清除'; }
+  showToast('已清除 DeepSeek Key');
+}
+
+// 统一调用 AI（优先 DeepSeek，降级 Anthropic）
+async function callAI(messages, maxTokens=1500) {
+  const dsKey = localStorage.getItem('deepseek_key');
+  const anthropicKey = localStorage.getItem('anthropic_key') || localStorage.getItem('ds_key');
+
+  if (dsKey) {
+    // 调用 DeepSeek 开放平台
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 40000);
+    try {
+      const r = await fetch('https://api.deepseek.com/chat/completions', {
+        method: 'POST',
+        signal: controller.signal,
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${dsKey}` },
+        body: JSON.stringify({
+          model: 'deepseek-chat',
+          max_tokens: maxTokens,
+          messages: messages
+        })
+      });
+      clearTimeout(timer);
+      if (!r.ok) throw new Error(`DeepSeek HTTP ${r.status}`);
+      const d = await r.json();
+      return d.choices?.[0]?.message?.content || '';
+    } catch(e) {
+      clearTimeout(timer);
+      if (e.name === 'AbortError') throw new Error('请求超时，请检查网络');
+      throw e;
+    }
+  } else if (anthropicKey) {
+    // 降级到 Anthropic（通过代理）
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 40000);
+    try {
+      const r = await fetch('/api/tikhub', {
+        method: 'POST',
+        signal: controller.signal,
+        headers: { 'Content-Type': 'application/json', 'x-anthropic-key': anthropicKey },
+        body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: maxTokens, messages })
+      });
+      clearTimeout(timer);
+      const d = await r.json();
+      if (d.error) throw new Error(d.error.message || JSON.stringify(d.error));
+      return d.content?.[0]?.text || '';
+    } catch(e) {
+      clearTimeout(timer);
+      throw e;
+    }
+  } else {
+    throw new Error('请先配置 DeepSeek API Key（点击右上角「配置DeepSeek Key」）');
+  }
+}
+
+// ============ BREAKDOWN WIZARD STEPS ============
+let breakdownData = {};   // 存储拆解结果
+let currentProduct = '';  // 当前选品
+let currentSellPoints = []; // 当前产品卖点
+
 function azGoto(step) {
-  [1,2,3].forEach(i => {
-    document.getElementById(`az-step${i}`).style.display = i===step?'block':'none';
+  [1,2,3,4].forEach(i => {
+    const el = document.getElementById(`az-step${i}`);
+    if (el) el.style.display = i===step ? 'block' : 'none';
     const ws = document.getElementById(`ws${i}`);
     const wn = document.getElementById(`wn${i}`);
+    if (!ws||!wn) return;
     ws.classList.remove('active','done');
     if(i < step) { ws.classList.add('done'); wn.textContent='✓'; }
     else if(i === step) { ws.classList.add('active'); wn.textContent=i; }
     else { wn.textContent=i; }
   });
 }
+function backToStep1() { azGoto(1); }
+function backToStep2() { azGoto(2); }
+function backToStep3() { azGoto(3); }
 
-function selectSource(src, el) {
-  document.querySelectorAll('.source-card').forEach(c => c.classList.remove('active'));
-  el.classList.add('active');
-  currentSource = src;
-  const g = SOURCE_GUIDES[src];
-  document.getElementById('guideTitle').textContent = `📖 ${g.name} · 获取步骤`;
-  document.getElementById('guideSteps').innerHTML = g.steps.map((s,i) =>
-    `<div class="guide-step"><div class="guide-num">${i+1}</div><span>${s}</span></div>`
-  ).join('');
-}
-selectSource('feigua', document.getElementById('src-feigua'));
+async function startBreakdown() {
+  const url = document.getElementById('douyinUrlInput').value.trim();
+  const text = document.getElementById('douyinTextInput').value.trim();
+  if (!url && !text) { showToast('请先粘贴抖音链接或视频文字！'); return; }
 
-document.getElementById('pasteArea').addEventListener('input', function() {
-  pastedData = this.value;
-  document.getElementById('charCount').textContent = this.value.length + ' 字符';
-});
-
-async function startAnalysis() {
-  const data = document.getElementById('pasteArea').value.trim();
-  if(!data) { showToast('请先粘贴数据！'); return; }
-  pastedData = data;
-  azGoto(3);
-
-  const activeTrack = selectedTracks.length > 0 ? selectedTracks.join('、') : '未指定';
-  document.getElementById('rptTrack').textContent = activeTrack;
-  document.getElementById('rptSource').textContent = SOURCE_GUIDES[currentSource]?.name || currentSource;
-
-  document.getElementById('reportContent').innerHTML = `
-    <div class="card" style="margin-bottom:14px;">
-      <div class="card-body" style="display:flex;gap:8px;align-items:center;font-size:13px;color:var(--muted);">
-        <div class="ld"></div><div class="ld"></div><div class="ld"></div>
-        &nbsp;AI 正在分析，请稍候...
-      </div>
+  azGoto(2);
+  document.getElementById('breakdownResult').innerHTML = `
+    <div style="display:flex;gap:8px;align-items:center;color:var(--muted);font-size:13px;padding:20px 0;">
+      <div class="ld"></div><div class="ld"></div><div class="ld"></div>
+      &nbsp;DeepSeek AI 正在深度拆解爆款结构，请稍候...
     </div>`;
+  document.getElementById('structureCards').innerHTML = '';
 
   const aiChat = document.getElementById('aiChat');
-  if(aiChat.querySelector('.empty')) aiChat.innerHTML='';
-  addMsg('user', `我上传了「${activeTrack}」赛道的数据，请帮我全面分析！`);
+  if (aiChat.querySelector('.empty')) aiChat.innerHTML = '';
+  addMsg('user', `请帮我深度拆解这个爆款视频的内容结构！\n${url || text}`);
   const loadEl = addLoadingMsg();
 
-  const prompt = `你是顶级抖音爆款内容分析师。
-赛道：${activeTrack}
-数据来源：${SOURCE_GUIDES[currentSource]?.name}
-原始数据：
-${pastedData}
+  const input = url
+    ? `抖音爆款视频链接：${url}\n${text ? '补充描述：'+text : ''}`
+    : `抖音爆款视频文案/描述：\n${text}`;
 
-请完成以下分析（中文，结构清晰，突出可操作建议）：
-1. **数据识别**：识别出有效视频数量、主要话题
-2. **爆款特征**：总结这批爆款视频的共同规律（标题特征、内容类型、情绪价值）
-3. **热度评分**：整体热度（0-100）、互动率水平、竞争烈度
-4. **选题建议**：3个可以立刻拍的爆款选题，越具体越好
-5. **标题公式**：这个赛道爆款标题的写法规律
+  const prompt = `你是顶级抖音爆款内容结构拆解专家。
 
-400字以内，重点突出，适当使用emoji。`;
+${input}
+
+请按以下框架进行深度拆解（中文，结合短视频创作逻辑）：
+
+## 🎯 爆款核心判断
+简要说明该视频为何能爆（情绪共鸣/痛点击中/信息价值/娱乐性等）
+
+## 📐 内容结构拆解
+| 结构层 | 内容 | 时长/位置 | 作用 |
+|--------|------|----------|------|
+（按顺序拆解：黄金3秒钩子 → 内容主体 → 高潮点 → 结尾CTA）
+
+## 🧲 核心钩子分析
+- **开头钩子类型**：（悬念式/痛点式/福利式/对比式/数字式）
+- **钩子话术**：具体的开头文案或逻辑
+- **钩子强度**：⭐⭐⭐⭐（1-5星）
+
+## 💡 情绪价值公式
+- 触发情绪：（好奇/焦虑/共鸣/惊喜/愤怒）
+- 情绪释放路径：
+
+## 📝 标题/文案公式
+总结出可复用的标题公式（用[]表示可替换变量）
+
+## 🎬 拍摄/制作特点
+- 画面风格、剪辑节奏、音乐选择、字幕等
+
+## 📊 爆款评分
+- 钩子力：X/10 | 信息密度：X/10 | 情绪价值：X/10 | 互动引导：X/10
+
+## 🔄 可复刻要素（最重要）
+列出3-5个核心可复刻的结构要素，让用户知道怎么套用`;
 
   try {
-    chatHistory.push({role:'user',content:prompt});
-    const _aiKey = localStorage.getItem('anthropic_key') || localStorage.getItem('ds_key') || '';
-    const res = await fetch('/api/tikhub',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','x-anthropic-key': _aiKey},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:chatHistory})
-    });
-    const d = await res.json();
-    const reply = d.content?.[0]?.text || '分析失败，请重试。';
-    chatHistory.push({role:'assistant',content:reply});
+    const messages = [{role:'user', content: prompt}];
+    chatHistory = [...messages];
+    const reply = await callAI(messages, 2000);
+    chatHistory.push({role:'assistant', content: reply});
     analysisResult = reply;
+    breakdownData.report = reply;
+    breakdownData.input = input;
 
-    loadEl.innerHTML = `<div class="msg-lbl">▸ AI 分析师</div><div class="msg-bubble">${reply.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>')}</div>`;
+    const formatted = reply
+      .replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')
+      .replace(/## (.*)/g,'<div style="font-size:14px;font-weight:700;color:var(--accent2);margin:16px 0 8px;border-left:3px solid var(--accent2);padding-left:10px;">$1</div>')
+      .replace(/\|(.*)\|/g, (m) => {
+        const cells = m.split('|').filter(c=>c.trim());
+        return `<div style="display:flex;gap:2px;margin:2px 0;">${cells.map(c=>`<div style="flex:1;background:var(--surface2);padding:4px 8px;font-size:11px;border-radius:3px;">${c.trim()}</div>`).join('')}</div>`;
+      })
+      .replace(/^- (.+)$/gm,'<div style="display:flex;gap:8px;margin:3px 0;font-size:12px;"><span style="color:var(--accent);">▸</span><span>$1</span></div>')
+      .replace(/\n/g,'<br>');
+
+    document.getElementById('breakdownResult').innerHTML = formatted;
+
+    // 生成结构可视化卡片
+    renderStructureCards(reply);
+
+    loadEl.innerHTML = `<div class="msg-lbl">▸ DeepSeek AI</div><div class="msg-bubble">${reply.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/## /g,'<br><strong>').replace(/\n/g,'<br>').slice(0,600)}...<br><em style="color:var(--accent2)">完整拆解已在左侧显示 →</em></div>`;
     document.getElementById('aiChat').scrollTop = 99999;
 
-    document.getElementById('reportContent').innerHTML = `
-      <div class="card" style="margin-bottom:14px;">
-        <div class="card-hd">
-          <div class="card-title">📊 爆款分析报告 · ${activeTrack}</div>
-          <div style="display:flex;gap:6px;">
-            <span class="tag">📈 ${activeTrack}</span>
-            <span class="tag blue">AI分析完成</span>
-          </div>
-        </div>
-        <div class="card-body" style="font-size:13px;line-height:1.8;">
-          ${reply.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>')}
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-hd"><div class="card-title">⚡ 下一步行动</div></div>
-        <div class="card-body">
-          <div style="display:flex;flex-direction:column;gap:10px;font-size:12px;">
-            <div style="display:flex;gap:10px;"><span style="font-size:16px;">💬</span><span>在右侧追问AI，获取更多具体建议</span></div>
-            <div style="display:flex;gap:10px;"><span style="font-size:16px;">📋</span><span>点击右侧「脚本框架」让AI帮你写完整脚本</span></div>
-            <div style="display:flex;gap:10px;"><span style="font-size:16px;">💾</span><span>点击「保存报告」记录本次分析结果</span></div>
-          </div>
-        </div>
-      </div>`;
   } catch(e) {
-    loadEl.innerHTML = `<div class="msg-lbl">▸ AI 分析师</div><div class="msg-bubble" style="color:var(--accent)">⚠️ API连接失败。请在支持Anthropic API的环境中运行。</div>`;
-    document.getElementById('reportContent').innerHTML = `<div class="card"><div class="card-body" style="color:var(--accent);font-size:13px;">⚠️ 分析失败，请检查网络连接和API配置。</div></div>`;
+    const errMsg = `⚠️ 拆解失败：${e.message}`;
+    document.getElementById('breakdownResult').innerHTML = `<div style="color:var(--accent);font-size:13px;padding:20px;">${errMsg}</div>`;
+    loadEl.innerHTML = `<div class="msg-lbl">▸ DeepSeek AI</div><div class="msg-bubble" style="color:var(--accent);">${errMsg}</div>`;
+    azGoto(1);
   }
 }
 
+function renderStructureCards(report) {
+  const container = document.getElementById('structureCards');
+  const sections = [
+    { icon:'🧲', label:'钩子类型', color:'#ff3355', key:'开头钩子类型' },
+    { icon:'💡', label:'情绪价值', color:'#f59e0b', key:'触发情绪' },
+    { icon:'📐', label:'内容结构', color:'#7c3aed', key:'结构' },
+    { icon:'📝', label:'标题公式', color:'#00d4ff', key:'标题' },
+  ];
+  container.innerHTML = sections.map(s => `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;border-top:3px solid ${s.color};">
+      <div style="font-size:18px;margin-bottom:6px;">${s.icon}</div>
+      <div style="font-size:11px;font-weight:700;color:${s.color};margin-bottom:4px;">${s.label}</div>
+      <div style="font-size:11px;color:var(--muted);line-height:1.6;">点击「选择产品」后AI自动填充</div>
+    </div>
+  `).join('');
+}
+
+function copyStructure() {
+  const text = document.getElementById('breakdownResult').innerText;
+  if (!text) { showToast('暂无内容可复制'); return; }
+  navigator.clipboard.writeText(text).then(() => showToast('✅ 结构已复制到剪贴板！'));
+}
+
+function goToProductSelect() { azGoto(3); }
+
+function quickProduct(name) {
+  document.getElementById('productInput').value = name;
+  searchProductSellPoints();
+}
+
+async function searchProductSellPoints() {
+  const product = document.getElementById('productInput').value.trim();
+  if (!product) { showToast('请输入产品名称！'); return; }
+  currentProduct = product;
+
+  const container = document.getElementById('productSellPoints');
+  const list = document.getElementById('sellPointsList');
+  container.style.display = 'block';
+  list.innerHTML = `<div style="display:flex;gap:8px;align-items:center;color:var(--muted);font-size:12px;padding:12px 0;"><div class="ld"></div><div class="ld"></div><div class="ld"></div>&nbsp;AI 全网搜索产品卖点中...</div>`;
+
+  addMsg('user', `我要用「${product}」套用这个爆款结构，请帮我搜索它的核心卖点`);
+  const loadEl = addLoadingMsg();
+
+  const prompt = `你是电商产品卖点专家。
+产品：${product}
+
+请从以下维度全面分析产品卖点（结合当前市场认知，拟人化、场景化表达）：
+
+1. **核心功能卖点**（3条，用数字/对比说话）
+2. **使用场景卖点**（3条，具体生活场景）
+3. **情感/身份认同卖点**（2条，让用户觉得"买了是在买更好的自己"）
+4. **差异化卖点**（2条，区别于同类产品的独特之处）
+5. **用户痛点对应**（3条，先说痛点再说产品如何解决）
+6. **爆款话术推荐**（3句可以直接用于视频的金句）
+
+格式：每条卖点控制在30字以内，简洁有力，适合短视频口播。`;
+
+  try {
+    const messages = [{role:'user', content: prompt}];
+    const reply = await callAI(messages, 1200);
+    currentSellPoints = reply;
+    breakdownData.product = product;
+    breakdownData.sellPoints = reply;
+
+    const formatted = reply
+      .replace(/\*\*(.*?)\*\*/g,'<strong style="color:var(--accent2);">$1</strong>')
+      .replace(/^(\d+)\./gm, '<br><span style="color:var(--accent);font-weight:700;">$1.</span>')
+      .replace(/\n/g,'<br>');
+
+    list.innerHTML = `
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px;font-size:12px;line-height:1.9;">
+        ${formatted}
+      </div>`;
+
+    loadEl.innerHTML = `<div class="msg-lbl">▸ DeepSeek AI</div><div class="msg-bubble">已搜索到「${product}」的核心卖点！现在可以一键生成爆款脚本了 ✨</div>`;
+    document.getElementById('aiChat').scrollTop = 99999;
+  } catch(e) {
+    list.innerHTML = `<div style="color:var(--accent);font-size:12px;padding:10px;">${e.message}</div>`;
+    loadEl.innerHTML = `<div class="msg-lbl">▸ DeepSeek AI</div><div class="msg-bubble" style="color:var(--accent);">搜索失败：${e.message}</div>`;
+  }
+}
+
+async function generateScript() {
+  if (!breakdownData.report) { showToast('请先完成爆款拆解！'); return; }
+  if (!currentProduct) { showToast('请先选择产品！'); return; }
+
+  azGoto(4);
+  document.getElementById('scriptOutput').innerHTML = `
+    <div style="display:flex;gap:8px;align-items:center;color:var(--muted);font-size:13px;padding:20px 0;">
+      <div class="ld"></div><div class="ld"></div><div class="ld"></div>
+      &nbsp;DeepSeek AI 正在生成爆款脚本，请稍候...
+    </div>`;
+
+  addMsg('user', `请根据爆款结构和「${currentProduct}」卖点，生成完整的视频脚本！`);
+  const loadEl = addLoadingMsg();
+
+  const prompt = `你是顶级抖音带货脚本创作专家。
+
+【爆款结构拆解报告】
+${breakdownData.report}
+
+【产品】：${currentProduct}
+【产品卖点】：
+${currentSellPoints}
+
+任务：完全按照上面拆解出的爆款结构，将「${currentProduct}」的卖点填充进去，生成一个完整的短视频脚本。
+
+要求：
+1. 严格保留原爆款视频的结构框架（钩子→主体→高潮→CTA）
+2. 开头3秒必须有强钩子，和原爆款一样的钩子类型
+3. 每个场景标注时间节点（0-3s / 3-15s / 15-45s / 45-60s）
+4. 包含：[画面]、[口播文案]、[字幕]、[BGM建议] 四个维度
+5. 结尾有明确的购买引导CTA
+6. 总时长控制在60秒以内
+7. 口播文案要口语化、有节奏感
+
+格式：
+---
+🎬 **脚本标题**：[根据标题公式生成的爆款标题]
+📊 **预估完播率**：XX%
+⏱️ **总时长**：XX秒
+
+---
+**[0-3秒] 黄金钩子**
+- 画面：
+- 口播：
+- 字幕：
+
+**[3-15秒] 铺垫/共鸣**
+- 画面：
+- 口播：
+- 字幕：
+
+（以此类推，完整写出每个结构段落）
+
+---
+📝 **备选标题** × 3：
+1.
+2.
+3.
+
+💬 **评论区引导话术**：`;
+
+  try {
+    const messages = [...chatHistory, {role:'user', content: prompt}];
+    const reply = await callAI(messages, 2500);
+    chatHistory.push({role:'user', content:`为${currentProduct}生成完整脚本`});
+    chatHistory.push({role:'assistant', content: reply});
+    analysisResult = reply;
+    breakdownData.script = reply;
+
+    const formatted = reply
+      .replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')
+      .replace(/^---$/gm,'<hr style="border-color:var(--border);margin:16px 0;">')
+      .replace(/^#+ (.+)$/gm,'<div style="font-size:14px;font-weight:700;color:var(--accent2);margin:14px 0 8px;">$1</div>')
+      .replace(/^- (.+)$/gm,'<div style="display:flex;gap:8px;margin:4px 0;font-size:12px;"><span style="color:var(--accent);">▸</span><span>$1</span></div>')
+      .replace(/\[(\d+-\d+秒[^\]]*)\]/g,'<span style="display:inline-block;background:rgba(255,51,85,0.1);color:var(--accent);border:1px solid rgba(255,51,85,0.25);border-radius:4px;padding:1px 8px;font-size:10px;font-family:\'IBM Plex Mono\',monospace;margin:2px 0;">⏱ $1</span>')
+      .replace(/\n/g,'<br>');
+
+    document.getElementById('scriptOutput').innerHTML = `
+      <div style="line-height:2;">${formatted}</div>
+      <div style="margin-top:20px;padding:14px;background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.2);border-radius:8px;">
+        <div style="font-size:11px;color:var(--green);font-weight:700;margin-bottom:8px;">🎉 脚本生成完成！下一步：</div>
+        <div style="font-size:12px;color:var(--text);line-height:1.8;">
+          1. 点击「复制脚本」一键复制全文<br>
+          2. 在右侧对话框向AI追问任何细节<br>
+          3. 点击「保存」留存本次创作
+        </div>
+      </div>`;
+
+    loadEl.innerHTML = `<div class="msg-lbl">▸ DeepSeek AI</div><div class="msg-bubble">🎬 「${currentProduct}」爆款脚本已生成！严格按照拆解结构创作，可直接开拍。如需调整风格、更换角度，随时告诉我！</div>`;
+    document.getElementById('aiChat').scrollTop = 99999;
+  } catch(e) {
+    document.getElementById('scriptOutput').innerHTML = `<div style="color:var(--accent);font-size:13px;padding:20px;">${e.message}</div>`;
+    loadEl.innerHTML = `<div class="msg-lbl">▸ DeepSeek AI</div><div class="msg-bubble" style="color:var(--accent);">生成失败：${e.message}</div>`;
+    azGoto(3);
+  }
+}
+
+function copyScript() {
+  const text = document.getElementById('scriptOutput').innerText;
+  if (!text || text.includes('请稍候')) { showToast('脚本尚未生成'); return; }
+  navigator.clipboard.writeText(text).then(() => showToast('✅ 脚本已复制到剪贴板！'));
+}
+
 function saveReport() {
-  if(!analysisResult) { showToast('没有可保存的报告'); return; }
-  const activeTrack = selectedTracks.join('、') || '未指定';
+  const content = breakdownData.script || breakdownData.report || analysisResult;
+  if(!content) { showToast('没有可保存的内容'); return; }
   const report = {
     id: Date.now(),
-    track: activeTrack,
-    source: SOURCE_GUIDES[currentSource]?.name,
+    track: currentProduct || selectedTracks.join('、') || '爆款拆解',
+    source: 'DeepSeek AI',
     time: new Date().toLocaleString('zh-CN'),
-    content: analysisResult,
-    rawData: pastedData,
+    content,
+    rawData: breakdownData.input || '',
   };
   savedReports.unshift(report);
   renderReportList();
   showToast('报告已保存！');
+}
+
+function exportReport() {
+  const content = breakdownData.script || breakdownData.report || analysisResult;
+  if (!content) { showToast('没有可导出的内容'); return; }
+  const text = `抖音爆款拆解报告\n产品：${currentProduct||'未指定'}\n生成时间：${new Date().toLocaleString('zh-CN')}\n\n${content}`;
+  const blob = new Blob([text],{type:'text/plain;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `爆款脚本_${currentProduct||'拆解'}_${new Date().toISOString().slice(0,10)}.txt`;
+  a.click();
+}
+
+function downloadReport(idx) {
+  const r = savedReports[idx];
+  const text = `抖音爆款分析报告\n产品/赛道：${r.track}\n来源：${r.source}\n生成时间：${r.time}\n\nAI分析结果：\n${r.content}\n\n原始数据：\n${r.rawData}`;
+  const blob = new Blob([text],{type:'text/plain;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `爆款脚本_${r.track}_${r.time.slice(0,10)}.txt`;
+  a.click();
 }
 
 function renderReportList() {
@@ -1541,7 +1916,7 @@ function renderReportList() {
   }
   sidebar.innerHTML = savedReports.map((r,i) => `
     <div class="report-item ${i===0?'active':''}" onclick="viewReport(${i},this)">
-      <div class="report-item-track">📊 ${r.track}</div>
+      <div class="report-item-track">📝 ${r.track}</div>
       <div class="report-item-meta">${r.source} · ${r.time}</div>
     </div>
   `).join('');
@@ -1555,7 +1930,7 @@ function viewReport(idx, el) {
   document.getElementById('reportMain').innerHTML = `
     <div class="report-main-hd">
       <div>
-        <div style="font-size:15px;font-weight:700;">📊 ${r.track} · 爆款分析报告</div>
+        <div style="font-size:15px;font-weight:700;">📝 ${r.track} · 爆款脚本</div>
         <div style="font-size:11px;color:var(--muted);margin-top:3px;">${r.source} · ${r.time}</div>
       </div>
       <button class="btn btn-ghost btn-sm" onclick="downloadReport(${idx})">⬇ 下载</button>
@@ -1567,18 +1942,6 @@ function viewReport(idx, el) {
     </div>`;
 }
 
-function downloadReport(idx) {
-  const r = savedReports[idx];
-  const text = `抖音爆款分析报告\n赛道：${r.track}\n数据来源：${r.source}\n生成时间：${r.time}\n\nAI分析结果：\n${r.content}\n\n原始数据：\n${r.rawData}`;
-  const blob = new Blob([text],{type:'text/plain;charset=utf-8'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `爆款分析_${r.track}_${r.time.slice(0,10)}.txt`;
-  a.click();
-}
-
-function exportReport() { downloadReport(0); }
-
 // ============ AI CHAT ============
 function addMsg(role, text) {
   const chat = document.getElementById('aiChat');
@@ -1586,7 +1949,7 @@ function addMsg(role, text) {
   const div = document.createElement('div');
   div.className = role==='ai'?'msg-ai':'msg-user';
   if(role==='ai') {
-    div.innerHTML = `<div class="msg-lbl">▸ AI 分析师</div><div class="msg-bubble">${text.replace(/\n/g,'<br>')}</div>`;
+    div.innerHTML = `<div class="msg-lbl">▸ DeepSeek AI</div><div class="msg-bubble">${text.replace(/\n/g,'<br>')}</div>`;
   } else {
     div.innerHTML = `<div class="msg-lbl" style="text-align:right">你 ▸</div><div class="msg-bubble">${text}</div>`;
   }
@@ -1600,36 +1963,10 @@ function addLoadingMsg() {
   if(chat.querySelector('.empty')) chat.innerHTML='';
   const div = document.createElement('div');
   div.className='msg-ai';
-  div.innerHTML = `<div class="msg-lbl">▸ AI 分析师</div><div class="loading-bubble"><div class="ld"></div><div class="ld"></div><div class="ld"></div></div>`;
+  div.innerHTML = `<div class="msg-lbl">▸ DeepSeek AI</div><div class="loading-bubble"><div class="ld"></div><div class="ld"></div><div class="ld"></div></div>`;
   chat.appendChild(div);
   chat.scrollTop = chat.scrollHeight;
   return div;
-}
-
-async function callAI(prompt) {
-  const loadEl = addLoadingMsg();
-  const activeTrack = selectedTracks.join('、') || '未指定';
-  chatHistory.push({role:'user',content:prompt});
-  try {
-    const _aiKey2 = localStorage.getItem('anthropic_key') || localStorage.getItem('ds_key') || '';
-    const res = await fetch('/api/tikhub',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','x-anthropic-key': _aiKey2},
-      body:JSON.stringify({
-        model:'claude-sonnet-4-20250514',
-        max_tokens:1000,
-        system:`你是专业的抖音爆款内容分析师。当前监测赛道：${activeTrack}。${analysisResult?'已有分析上下文：'+analysisResult.slice(0,200):''}。请用简洁、专业、可操作的方式回答，重点给出具体建议，250字以内，适当使用emoji。`,
-        messages:chatHistory
-      })
-    });
-    const d = await res.json();
-    const reply = d.content?.[0]?.text || '请重试。';
-    chatHistory.push({role:'assistant',content:reply});
-    loadEl.innerHTML = `<div class="msg-lbl">▸ AI 分析师</div><div class="msg-bubble">${reply.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>')}</div>`;
-    document.getElementById('aiChat').scrollTop = 99999;
-  } catch(e) {
-    loadEl.innerHTML = `<div class="msg-lbl">▸ AI 分析师</div><div class="msg-bubble" style="color:var(--accent)">⚠️ 连接失败，请重试。</div>`;
-  }
 }
 
 async function sendMsg() {
@@ -1637,8 +1974,20 @@ async function sendMsg() {
   const text = input.value.trim();
   if(!text) return;
   input.value='';
-  addMsg('user',text);
-  await callAI(text);
+  addMsg('user', text);
+  const loadEl = addLoadingMsg();
+  const activeTrack = selectedTracks.join('、') || '未指定';
+  const systemCtx = breakdownData.report ? `\n爆款拆解上下文：${breakdownData.report.slice(0,300)}` : '';
+  chatHistory.push({role:'user', content: text});
+  try {
+    const msgs = [{role:'user', content:`你是专业的抖音爆款内容创作专家。当前赛道：${activeTrack}${systemCtx}\n\n用户问题：${text}\n\n请简洁、可操作地回答，250字以内，适当用emoji。`}];
+    const reply = await callAI(msgs, 800);
+    chatHistory.push({role:'assistant', content: reply});
+    loadEl.innerHTML = `<div class="msg-lbl">▸ DeepSeek AI</div><div class="msg-bubble">${reply.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>')}</div>`;
+    document.getElementById('aiChat').scrollTop = 99999;
+  } catch(e) {
+    loadEl.innerHTML = `<div class="msg-lbl">▸ DeepSeek AI</div><div class="msg-bubble" style="color:var(--accent)">⚠️ ${e.message}</div>`;
+  }
 }
 
 function quickAsk(text) {

@@ -101,10 +101,14 @@ export default async function handler(req) {
 
       const kw = encodeURIComponent(keyword);
 
-      // 并行同时请求三个接口，谁先有数据用谁
-      const tryFetch = async (url, label) => {
+      // 并行同时请求，POST 方式
+      const tryFetch = async (url, label, body) => {
         try {
-          const r = await fetchWithTimeout(url, { headers: authHeaders }, 15000);
+          const r = await fetchWithTimeout(url, {
+            method: 'POST',
+            headers: authHeaders,
+            body: JSON.stringify(body),
+          }, 15000);
           const j = await r.json();
           if (j?.code !== 200) return { label, code: j?.code, msg: j?.message_zh || j?.message, list: [] };
 
@@ -119,10 +123,11 @@ export default async function handler(req) {
         }
       };
 
+      const searchBody = { keyword, count: 20 };
       const [r1, r2, r3] = await Promise.all([
-        tryFetch(`${BASE}/api/v1/douyin/web/fetch_video_search_result?keyword=${kw}&count=20&offset=0&sort_type=0&publish_time=0`, 'web'),
-        tryFetch(`${BASE}/api/v1/douyin/app/v3/fetch_video_search_result?keyword=${kw}&count=20`, 'app_v3_video'),
-        tryFetch(`${BASE}/api/v1/douyin/app/v3/fetch_search_result?keyword=${kw}&count=20`, 'app_v3_search'),
+        tryFetch(`${BASE}/api/v1/douyin/search/fetch_video_search_v1`, 'search_v1', searchBody),
+        tryFetch(`${BASE}/api/v1/douyin/search/fetch_video_search_v2`, 'search_v2', searchBody),
+        tryFetch(`${BASE}/api/v1/douyin/search/fetch_general_search_v1`, 'general_v1', searchBody),
       ]);
 
       const debugLog = [r1, r2, r3].map(r => ({
@@ -208,18 +213,21 @@ export default async function handler(req) {
         // 热搜（已知可用）
         { url: `${BASE}/api/v1/douyin/app/v3/fetch_hot_search_list`, label: 'hot_search' },
         // douyin/search/ 系列
-        { url: `${BASE}/api/v1/douyin/search/fetch_video_search_v1?keyword=${kw}&count=10`, label: 'search_v1' },
-        { url: `${BASE}/api/v1/douyin/search/fetch_video_search_v2?keyword=${kw}&count=10`, label: 'search_v2' },
-        { url: `${BASE}/api/v1/douyin/search/fetch_general_search_v1?keyword=${kw}&count=10`, label: 'general_v1' },
-        { url: `${BASE}/api/v1/douyin/search/fetch_general_search_v2?keyword=${kw}&count=10`, label: 'general_v2' },
-        // douyin/billboard/ 系列
-        { url: `${BASE}/api/v1/douyin/billboard/fetch_hot_list`, label: 'billboard_hot' },
-        { url: `${BASE}/api/v1/douyin/billboard/fetch_video_hot_list`, label: 'billboard_video' },
-        { url: `${BASE}/api/v1/douyin/billboard/fetch_category_hot_list`, label: 'billboard_category' },
+        { url: `${BASE}/api/v1/douyin/search/fetch_video_search_v1`, label: 'search_v1', method: 'POST', body: { keyword: '美妆', count: 10 } },
+        { url: `${BASE}/api/v1/douyin/search/fetch_video_search_v2`, label: 'search_v2', method: 'POST', body: { keyword: '美妆', count: 10 } },
+        { url: `${BASE}/api/v1/douyin/search/fetch_general_search_v1`, label: 'general_v1', method: 'POST', body: { keyword: '美妆', count: 10 } },
+        { url: `${BASE}/api/v1/douyin/search/fetch_general_search_v2`, label: 'general_v2', method: 'POST', body: { keyword: '美妆', count: 10 } },
+        // douyin/billboard/ 系列 - 尝试更多接口名
+        { url: `${BASE}/api/v1/douyin/billboard/fetch_douyin_hot_video_list`, label: 'billboard_v1' },
+        { url: `${BASE}/api/v1/douyin/billboard/fetch_hot_search_list`, label: 'billboard_hot_search' },
+        { url: `${BASE}/api/v1/douyin/billboard/fetch_rising_hot_list`, label: 'billboard_rising' },
       ];
-      const results = await Promise.all(urls.map(async ({ url, label }) => {
+      const results = await Promise.all(urls.map(async ({ url, label, method, body }) => {
         try {
-          const r = await fetchWithTimeout(url, { headers: authHeaders }, 12000);
+          const fetchOpts = method === 'POST'
+            ? { headers: { ...authHeaders }, method: 'POST', body: JSON.stringify(body) }
+            : { headers: authHeaders };
+          const r = await fetchWithTimeout(url, fetchOpts, 12000);
           const text = await r.text();
           let j = {};
           try { j = JSON.parse(text); } catch(e) {}

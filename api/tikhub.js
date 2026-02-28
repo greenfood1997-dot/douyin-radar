@@ -205,14 +205,18 @@ export default async function handler(req) {
       for (const url of urls) {
         try {
           const r = await fetch(url, { headers: authHeaders });
-          const j = await r.json();
+          const text = await r.text();
           const path = url.replace(BASE, '').split('?')[0];
+          let j = {};
+          try { j = JSON.parse(text); } catch(e) {}
           const list = j?.data?.aweme_list || j?.data?.data || [];
           results[path] = {
+            httpStatus: r.status,
             code: j?.code,
+            message: j?.message_zh || j?.message || '',
             listCount: Array.isArray(list) ? list.length : typeof list,
             dataKeys: Object.keys(j?.data || {}),
-            firstDesc: Array.isArray(list) && list[0] ? (list[0].aweme_info?.desc || list[0].desc || 'no desc') : 'empty',
+            rawSlice: text.slice(0, 300),
           };
         } catch(e) {
           results[url.replace(BASE, '').split('?')[0]] = { error: e.message };

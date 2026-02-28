@@ -92,7 +92,7 @@ export default async function handler(req) {
 
       const kw = encodeURIComponent(keyword);
       const res = await fetch(
-        `${BASE}/api/v1/douyin/app/v3/fetch_search_result?keyword=${kw}&count=20&offset=0&search_id=&sort_type=0&publish_time=0&filter_duration=0`,
+        `${BASE}/api/v1/douyin/app/v3/fetch_video_search_result?keyword=${kw}&count=20&offset=0&search_id=&sort_type=0&publish_time=0&filter_duration=0`,
         { headers: authHeaders }
       );
       const json = await res.json();

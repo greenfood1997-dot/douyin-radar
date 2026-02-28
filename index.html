@@ -538,8 +538,8 @@ header {
   <div class="header-center">
     <div class="nav-tab active" onclick="switchView('monitor',this)">📡 实时监测</div>
     <div class="nav-tab" onclick="switchView('track',this)">🏁 赛道选取</div>
-    <div class="nav-tab" onclick="switchView('analyze',this)">🔍 爆款拆解</div>
-    <div class="nav-tab" onclick="switchView('report',this)">👤 账号监测</div>
+    <div class="nav-tab" onclick="switchView('analyze',this)">🔍 数据分析</div>
+    <div class="nav-tab" onclick="switchView('report',this)">📋 分析报告</div>
   </div>
   <div class="header-right">
     <div class="status-pill">
@@ -715,88 +715,120 @@ header {
 <div class="analyze-layout">
 
   <div>
-    <div class="section-hd" style="margin-bottom:12px;">
-      <div>
-        <div class="section-title">🔍 爆款视频拆解 · 一键复刻</div>
-        <div class="section-sub">粘贴抖音爆款视频链接，AI深度拆解结构，选择你的产品一键生成新脚本</div>
+    <!-- Wizard -->
+    <div class="step-wizard">
+      <div class="wizard-step active" id="ws1"><div class="wizard-num" id="wn1">1</div>选数据来源</div>
+      <div class="wizard-step" id="ws2"><div class="wizard-num" id="wn2">2</div>粘贴数据</div>
+      <div class="wizard-step" id="ws3"><div class="wizard-num" id="wn3">3</div>AI分析</div>
+    </div>
+
+    <!-- Step 1: Source -->
+    <div id="az-step1">
+      <div class="section-label">选择数据来源平台</div>
+      <div class="source-grid">
+        <div class="source-card active" id="src-feigua" onclick="selectSource('feigua',this)">
+          <div class="source-icon">🥒</div>
+          <div class="source-name">飞瓜数据</div>
+          <div class="source-desc">综合排行·免费版可用</div>
+        </div>
+        <div class="source-card" id="src-chanmama" onclick="selectSource('chanmama',this)">
+          <div class="source-icon">🦗</div>
+          <div class="source-name">蝉妈妈</div>
+          <div class="source-desc">带货电商·数据丰富</div>
+        </div>
+        <div class="source-card" id="src-huitun" onclick="selectSource('huitun',this)">
+          <div class="source-icon">🐷</div>
+          <div class="source-name">灰豚数据</div>
+          <div class="source-desc">性价比高·小白友好</div>
+        </div>
+        <div class="source-card" id="src-official" onclick="selectSource('official',this)">
+          <div class="source-icon">📊</div>
+          <div class="source-name">巨量算数</div>
+          <div class="source-desc">官方免费·数据权威</div>
+        </div>
+        <div class="source-card" id="src-manual" onclick="selectSource('manual',this)">
+          <div class="source-icon">✏️</div>
+          <div class="source-name">手动整理</div>
+          <div class="source-desc">自己看到的直接输入</div>
+        </div>
+        <div class="source-card" id="src-other" onclick="selectSource('other',this)">
+          <div class="source-icon">🔗</div>
+          <div class="source-name">其他来源</div>
+          <div class="source-desc">截图文字·随意粘贴</div>
+        </div>
+      </div>
+      <div class="guide-box" id="guideBox">
+        <div class="guide-title" id="guideTitle"></div>
+        <div id="guideSteps"></div>
+      </div>
+      <div style="margin-top:16px;">
+        <button class="btn btn-red" onclick="azGoto(2)">下一步：粘贴数据 →</button>
       </div>
     </div>
 
-    <div class="card" style="margin-bottom:14px;">
-      <div class="card-hd"><div class="card-title">📎 第一步：粘贴爆款视频链接</div></div>
-      <div class="card-body">
-        <div style="display:flex;gap:10px;align-items:center;">
-          <input type="text" id="videoUrlInput" placeholder="粘贴抖音视频链接 https://www.douyin.com/video/... 或直接输入视频标题"
-            style="flex:1;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;padding:11px 14px;color:var(--text);font-family:'Noto Sans SC',sans-serif;font-size:13px;outline:none;transition:border-color 0.2s;"
-            onfocus="this.style.borderColor='var(--accent2)'" onblur="this.style.borderColor='var(--border)'"
-            onkeydown="if(event.key==='Enter') analyzeVideoUrl()"
-          />
-          <button class="btn btn-red" onclick="analyzeVideoUrl()" style="white-space:nowrap;padding:11px 20px;">🚀 开始拆解</button>
-        </div>
-        <div style="margin-top:10px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-          <span style="font-size:10px;color:var(--muted);">快速测试：</span>
-          <span class="qtag" onclick="document.getElementById('videoUrlInput').value='https://www.douyin.com/video/7421025056555885884';analyzeVideoUrl()">示例美妆视频</span>
-          <span class="qtag" onclick="document.getElementById('videoUrlInput').value='没有链接，我来描述：一个做饭视频，标题是「婆婆做了30年的红烧肉秘方」，点赞50万';analyzeVideoUrl()">没有链接手动描述</span>
-        </div>
+    <!-- Step 2: Paste -->
+    <div id="az-step2" style="display:none;">
+      <div class="section-label">粘贴数据</div>
+      <div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:6px;padding:10px 14px;font-size:12px;color:var(--gold);margin-bottom:12px;">
+        ⚡ 不需要格式整齐，随便粘贴！AI会自动识别标题、点赞、评论等信息。
+      </div>
+      <textarea class="paste-area" id="pasteArea" placeholder="把从飞瓜/蝉妈妈/巨量算数复制的内容粘贴到这里...
+
+支持各种格式，例如：
+▶ 视频标题 点赞10.2万 评论3400 分享2.1万
+▶ 一行一个视频也行
+▶ 截图文字、网页文字都可以
+▶ 甚至只是你手打的标题和大概数据"></textarea>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:11px;color:var(--muted);">
+        <span id="charCount">0 字符</span>
+        <span>粘贴后点击分析</span>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:14px;align-items:center;">
+        <button class="btn btn-ghost" onclick="azGoto(1)">← 上一步</button>
+        <button class="btn btn-red" onclick="startAnalysis()" style="padding:10px 28px;">🚀 开始AI分析</button>
+        <span style="font-size:11px;color:var(--muted);">约10-20秒</span>
       </div>
     </div>
 
-    <div id="az-result" style="display:none;">
-      <div class="card" style="margin-bottom:14px;" id="videoInfoCard"></div>
-      <div class="card" style="margin-bottom:14px;" id="structureCard"></div>
-      <div class="card" id="replicateCard">
-        <div class="card-hd"><div class="card-title">⚡ 第二步：选择你的产品，一键复刻</div></div>
-        <div class="card-body">
-          <div style="margin-bottom:12px;">
-            <div style="font-size:11px;color:var(--muted);margin-bottom:8px;font-family:'IBM Plex Mono',monospace;">选择产品类型</div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap;">
-              <button class="btn btn-ghost btn-sm product-type-btn" onclick="selectProductType(this,'美食/餐饮')">🍜 美食/餐饮</button>
-              <button class="btn btn-ghost btn-sm product-type-btn" onclick="selectProductType(this,'美妆护肤')">💄 美妆护肤</button>
-              <button class="btn btn-ghost btn-sm product-type-btn" onclick="selectProductType(this,'服装穿搭')">👗 服装穿搭</button>
-              <button class="btn btn-ghost btn-sm product-type-btn" onclick="selectProductType(this,'数码家电')">📱 数码家电</button>
-              <button class="btn btn-ghost btn-sm product-type-btn" onclick="selectProductType(this,'家居生活')">🏠 家居生活</button>
-              <button class="btn btn-ghost btn-sm product-type-btn" onclick="selectProductType(this,'健康养生')">💪 健康养生</button>
-              <button class="btn btn-ghost btn-sm product-type-btn" onclick="selectProductType(this,'母婴亲子')">👶 母婴亲子</button>
-              <button class="btn btn-ghost btn-sm product-type-btn" onclick="selectProductType(this,'汽车')">🚗 汽车</button>
-            </div>
-          </div>
-          <div style="margin-bottom:14px;">
-            <div style="font-size:11px;color:var(--muted);margin-bottom:6px;font-family:'IBM Plex Mono',monospace;">填写你的具体产品（AI会全网搜索买点）</div>
-            <input type="text" id="myProductInput" placeholder="例如：XX品牌防晒霜、自家农场草莓、某款无线耳机..."
-              style="width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--text);font-size:13px;outline:none;font-family:'Noto Sans SC',sans-serif;box-sizing:border-box;transition:border-color 0.2s;"
-              onfocus="this.style.borderColor='var(--accent2)'" onblur="this.style.borderColor='var(--border)'"
-            />
-          </div>
-          <button class="btn btn-red" onclick="replicateWithProduct()" style="width:100%;padding:12px;font-size:13px;">
-            ✨ 全网搜索产品买点 · 按爆款结构生成新脚本
-          </button>
+    <!-- Step 3: Result -->
+    <div id="az-step3" style="display:none;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+        <div>
+          <div style="font-size:15px;font-weight:700;">📊 分析报告</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;">赛道：<span id="rptTrack" style="color:var(--accent2)"></span> · 来源：<span id="rptSource"></span></div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-ghost btn-sm" onclick="azGoto(2)">重新粘贴</button>
+          <button class="btn btn-ghost btn-sm" onclick="exportReport()">⬇ 导出</button>
+          <button class="btn btn-red btn-sm" onclick="saveReport()">💾 保存报告</button>
         </div>
       </div>
-      <div id="newScriptCard" style="display:none;margin-top:14px;"></div>
+      <div id="reportContent"></div>
     </div>
   </div>
 
+  <!-- AI Sidebar -->
   <div class="ai-sidebar">
     <div class="ai-hd">
       <div>
         <div class="ai-title">🤖 AI 分析师</div>
-        <div style="font-size:10px;color:var(--muted);margin-top:2px;">随时追问 · 深度拆解</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:2px;">随时提问 · 深度拆解</div>
       </div>
       <button class="btn btn-ghost btn-sm" onclick="clearChat()">清空</button>
     </div>
     <div class="ai-chat" id="aiChat">
       <div class="empty">
         <div class="empty-icon">💬</div>
-        <div class="empty-text">粘贴爆款视频链接<br>AI自动开始拆解</div>
+        <div class="empty-text">完成左侧步骤<br>AI自动开始分析</div>
       </div>
     </div>
     <div class="quick-tags">
-      <span class="qtag" onclick="quickAsk('这个视频为什么爆？核心原因是什么')">爆火原因</span>
-      <span class="qtag" onclick="quickAsk('这个视频的开场钩子用的什么技巧？')">开场技巧</span>
-      <span class="qtag" onclick="quickAsk('帮我写3个类似的爆款标题')">爆款标题</span>
-      <span class="qtag" onclick="quickAsk('这个结构适合哪些赛道复用？')">赛道复用</span>
-      <span class="qtag" onclick="quickAsk('这个视频的情绪价值点在哪里？')">情绪价值</span>
-      <span class="qtag" onclick="quickAsk('给我完整的拍摄脚本，分镜到秒')">完整脚本</span>
+      <span class="qtag" onclick="quickAsk('这个赛道最近什么内容容易爆？')">爆款规律</span>
+      <span class="qtag" onclick="quickAsk('给我3个可以立刻拍的爆款选题，越具体越好')">立刻能拍的选题</span>
+      <span class="qtag" onclick="quickAsk('这类视频的标题公式是什么？')">标题公式</span>
+      <span class="qtag" onclick="quickAsk('帮我写一个完整的视频脚本框架')">脚本框架</span>
+      <span class="qtag" onclick="quickAsk('分析一下竞争对手的共同点')">竞品分析</span>
+      <span class="qtag" onclick="quickAsk('预测未来1-2周这个赛道的趋势')">趋势预测</span>
     </div>
     <div class="chat-bottom">
       <textarea class="chat-input" id="chatInput" placeholder="问任何问题..." onkeydown="handleKey(event)"></textarea>
@@ -811,65 +843,21 @@ header {
 <!-- ========== VIEW: REPORT ========== -->
 <div id="view-report">
 <div class="page">
-  <div class="section-hd" style="margin-bottom:16px;">
+  <div class="section-hd">
     <div>
-      <div class="section-title">👤 账号监测中心</div>
-      <div class="section-sub">添加竞争对手或标杆账号，实时监测其爆款动态，一旦出现爆款立即预警</div>
+      <div class="section-title">📋 历史分析报告</div>
+      <div class="section-sub">已保存的分析记录，随时回顾</div>
     </div>
-    <button class="btn btn-red" onclick="openAddAccountModal()">+ 添加账号</button>
+    <button class="btn btn-ghost" onclick="switchView('analyze',document.querySelectorAll('.nav-tab')[2])">+ 新建分析</button>
   </div>
-
-  <!-- 账号列表 -->
-  <div style="display:grid;grid-template-columns:300px 1fr;gap:16px;">
-
-    <!-- 左侧账号列表 -->
-    <div style="display:flex;flex-direction:column;gap:10px;">
-      <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:2px;color:var(--muted);margin-bottom:4px;">已监测账号</div>
-      <div id="accountList">
-        <div class="empty" style="padding:40px 0;">
-          <div class="empty-icon">👤</div>
-          <div class="empty-text">还没有监测账号<br>点击右上角「添加账号」</div>
-        </div>
-      </div>
+  <div class="report-layout">
+    <div class="report-sidebar" id="reportSidebar">
+      <div class="empty" style="padding:32px 0;"><div class="empty-icon">📂</div><div class="empty-text">暂无保存的报告<br>完成分析后点击「保存」</div></div>
     </div>
-
-    <!-- 右侧账号详情 + 爆款动态 -->
-    <div id="accountDetail">
-      <div class="empty" style="padding:80px 0;">
-        <div class="empty-icon">📊</div>
-        <div class="empty-text">选择左侧账号<br>查看实时监测数据</div>
-      </div>
-    </div>
-
-  </div>
-</div>
-</div>
-
-<!-- 添加账号弹窗 -->
-<div id="addAccountModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:9998;align-items:center;justify-content:center;backdrop-filter:blur(8px);">
-  <div style="background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:28px;width:92%;max-width:480px;box-shadow:0 24px 60px rgba(0,0,0,0.5);">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
-      <div style="font-size:15px;font-weight:700;">+ 添加监测账号</div>
-      <button onclick="document.getElementById('addAccountModal').style.display='none'" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:20px;">✕</button>
-    </div>
-    <div style="font-size:11px;color:var(--muted);margin-bottom:8px;font-family:'IBM Plex Mono',monospace;">抖音号（unique_id）</div>
-    <input id="addAccountInput" type="text" placeholder="输入抖音号，如：douguo_app、Li Ziqi 等"
-      style="width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;padding:11px 14px;color:var(--text);font-family:'Noto Sans SC',sans-serif;font-size:13px;outline:none;box-sizing:border-box;margin-bottom:8px;transition:border-color 0.2s;"
-      onfocus="this.style.borderColor='var(--accent2)'" onblur="this.style.borderColor='var(--border)'"
-      onkeydown="if(event.key==='Enter') confirmAddAccount()"
-    />
-    <div style="font-size:10px;color:var(--muted);margin-bottom:16px;line-height:1.7;">
-      💡 在抖音主页 → 点分享 → 复制链接，链接中的 @ 后面就是抖音号
-    </div>
-    <div id="addAccountError" style="display:none;color:var(--accent);font-size:11px;margin-bottom:10px;"></div>
-    <div style="display:flex;gap:10px;">
-      <button onclick="confirmAddAccount()" class="btn btn-red" style="flex:1;padding:12px;">🔍 查询并添加</button>
-      <button onclick="document.getElementById('addAccountModal').style.display='none'" class="btn btn-ghost" style="padding:12px 16px;">取消</button>
+    <div class="report-main" id="reportMain">
+      <div class="empty" style="padding:80px 0;"><div class="empty-icon">📋</div><div class="empty-text">选择左侧报告查看详情</div></div>
     </div>
   </div>
-</div>
-
-</div>
 </div>
 </div>
 
@@ -878,11 +866,6 @@ header {
 let selectedTracks = [];
 let monitorInterval = null;
 let monitorRunning = false;
-// 提前声明，防止 refreshFeed 等函数在初始化前引用报错
-let _dsSource    = localStorage.getItem('ds_source') || null;
-let _dsKey       = localStorage.getItem('ds_key')    || null;
-let _dsConnected = false;
-let _dsSelectedSource = _dsSource || 'tikhub';
 let monitorCountdown = 60;
 let countdownTimer = null;
 let feedFilter = 'all';
@@ -940,7 +923,6 @@ function switchView(name, el) {
   document.getElementById('view-'+name).classList.add('active');
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
   if(el) el.classList.add('active');
-  if(name === 'track') renderTrackGrid();
 }
 
 // ============ TRACK SELECTION ============
@@ -1158,32 +1140,67 @@ async function refreshFeed(isFirst) {
   const list = document.getElementById('feedList');
 
   if (hasCfg) {
+    const trackList = selectedTracks.length > 0 ? selectedTracks : null;
+
     if (list) list.innerHTML = `
       <div style="padding:60px 20px;text-align:center;">
         <div style="font-size:30px;animation:spin 0.8s linear infinite;display:inline-block;margin-bottom:12px;">⟳</div>
-        <div style="font-size:13px;color:#6b7280;font-weight:600;">正在获取真实抖音热搜…</div>
+        <div style="font-size:13px;color:#6b7280;font-weight:600;">正在搜索「${trackList ? trackList.join(' · ') : '热搜'}」赛道视频…</div>
       </div>`;
 
     try {
-      // 直接获取热搜榜（最稳定的接口）
+      let allResults = [];
+
+      if (trackList && trackList.length > 0) {
+        // ✅ 按每个赛道关键词搜索真实视频
+        for (const track of trackList) {
+          // 取该赛道第一个关键词作为搜索词（最精准）
+          const kws = TRACK_KEYWORDS[track] || [track];
+          const searchKw = kws[0];
+
+          const items = await fetchViaTikHub(searchKw);
+          if (items && items.length > 0) {
+            items.forEach(item => {
+              allResults.push({ ...item, _track: track });
+            });
+          }
+        }
+      }
+
+      // 如果赛道搜索有结果，直接用
+      if (allResults.length > 0) {
+        feedData = allResults.map(item => normalizeAweme(item, item._track)).filter(Boolean);
+        feedData.sort((a, b) => b.heat - a.heat);
+        feedData.slice(0, 3).forEach(v => { v.isNew = true; });
+        _dsConnected = true;
+        renderFeed(isFirst);
+        updateMetrics();
+        if (!isFirst) generateAlert();
+        drawTrendChart();
+        _refreshDsBadges();
+        return;
+      }
+
+      // 搜索无结果时 fallback 到热搜榜，并用关键词过滤
       const hotItems = await fetchHotSearch();
-
       if (hotItems?.length > 0) {
-        const trackList = selectedTracks.length > 0 ? selectedTracks : ['热搜'];
         const results = [];
-
         hotItems.forEach((item, idx) => {
           const word = item.word || item.desc || '';
           if (!word) return;
 
-          // 按赛道关键词匹配，给每条热搜打上对应赛道标签
-          let matchedTrack = trackList[0] || '热搜';
-          for (const track of trackList) {
-            const kws = TRACK_KEYWORDS[track] || [];
-            if (kws.some(k => word.includes(k))) {
-              matchedTrack = track;
-              break;
+          // 匹配赛道标签
+          let matchedTrack = trackList ? null : '热搜';
+          if (trackList) {
+            for (const track of trackList) {
+              const kws = TRACK_KEYWORDS[track] || [track];
+              if (kws.some(k => word.includes(k))) {
+                matchedTrack = track;
+                break;
+              }
             }
+            // 如果没有匹配到具体赛道，仍然显示但打上第一个赛道标签
+            if (!matchedTrack) matchedTrack = trackList[0];
           }
 
           results.push({
@@ -1307,47 +1324,11 @@ function updateMetrics() {
 }
 
 function generateAlert() {
-  const track = selectedTracks[Math.floor(Math.random()*selectedTracks.length)] || '美食';
-  const trackKws = TRACK_KEYWORDS[track] || [track];
-  const kw = trackKws[0];
-  const douyinSearchUrl = 'https://www.douyin.com/search/' + encodeURIComponent(kw) + '?type=video&sort_type=1';
-
-  // 如果有真实数据，从 feedData 中取榜首视频
-  const topVideo = feedData.find(v => v.source === 'real');
-  const topVideoUrl = topVideo?.url || douyinSearchUrl;
-  const topVideoAuthorUrl = topVideo?.authorUrl || ('https://www.douyin.com/search/' + encodeURIComponent(kw) + '?type=user');
-
-  // 新进榜视频 - 从 feedData 中随机取新视频的账号
-  const newEntries = feedData.filter(v => v.isNew && v.source === 'real');
-  const newEntryCount = Math.floor(Math.random()*3+1);
-  const newEntryAuthorUrl = newEntries[0]?.authorUrl || ('https://www.douyin.com/search/' + encodeURIComponent(kw) + '?type=user');
-
   const types = [
-    {
-      type:'SPIKE', cls:'',
-      text:`「${track}」赛道急速上升，热度 +${Math.floor(Math.random()*20+10)}%`,
-      link: douyinSearchUrl,
-      linkText: '查看相关视频 →'
-    },
-    {
-      type:'NEW TREND', cls:'blue',
-      text:`新兴关键词「${['返璞归真','极简主义','硬核干货','沉浸式'][Math.floor(Math.random()*4)]}」使用量暴增`,
-      link: douyinSearchUrl,
-      linkText: '搜索该话题 →'
-    },
-    {
-      type:'TOP VIDEO', cls:'gold',
-      text:`榜首视频累计 ${(Math.random()*50+20).toFixed(1)} 万点赞，建议立即分析`,
-      link: topVideoUrl,
-      linkText: '查看该视频 →'
-    },
-    {
-      type:'NEW ENTRY', cls:'green',
-      text:`「${track}」赛道新进榜 ${newEntryCount} 个视频，均来自素人账号`,
-      link: newEntryAuthorUrl,
-      linkText: '查看素人账号 →',
-      extraLinks: newEntries.slice(0, newEntryCount).map(v => ({url: v.authorUrl || topVideoAuthorUrl, label: '@' + (v.author || '素人账号')}))
-    },
+    {type:'SPIKE',cls:'',text:`「${selectedTracks[0]||'美食'}」赛道出现急速上升视频，热度指数在30分钟内提升 +${Math.floor(Math.random()*20+10)}%`},
+    {type:'NEW TREND',cls:'blue',text:`检测到新兴关键词：「${['返璞归真','极简主义','硬核干货','沉浸式'][Math.floor(Math.random()*4)]}」，近24小时使用量暴增`},
+    {type:'TOP VIDEO',cls:'gold',text:`本小时榜首视频已累计 ${(Math.random()*50+20).toFixed(1)} 万点赞，建议立即分析内容结构`},
+    {type:'NEW ENTRY',cls:'green',text:`${selectedTracks[Math.floor(Math.random()*selectedTracks.length)]||'搞笑'}赛道新进榜 ${Math.floor(Math.random()*3+1)} 个视频，均来自素人账号`},
   ];
   const alert = types[Math.floor(Math.random()*types.length)];
   const alertList = document.getElementById('alertList');
@@ -1355,23 +1336,9 @@ function generateAlert() {
   const now = new Date().toLocaleTimeString('zh-CN');
   const div = document.createElement('div');
   div.className = `alert-item ${alert.cls}`;
-  div.style.cursor = 'pointer';
-
-  // 额外账号链接（NEW ENTRY 类型专用）
-  const extraLinksHtml = (alert.extraLinks && alert.extraLinks.length > 0)
-    ? `<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:5px;">${alert.extraLinks.map(l => `<a href="${l.url}" target="_blank" onclick="event.stopPropagation()" style="font-size:10px;color:var(--accent2);text-decoration:none;background:rgba(0,212,255,0.08);border:1px solid rgba(0,212,255,0.2);border-radius:4px;padding:2px 8px;">${l.label}</a>`).join('')}</div>`
-    : '';
-
-  div.innerHTML = `
-    <div class="alert-type">${alert.type}</div>
-    <div class="alert-text">${alert.text}</div>
-    ${extraLinksHtml}
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px;">
-      <div class="alert-time">${now}</div>
-      <a href="${alert.link}" target="_blank" onclick="event.stopPropagation()" style="font-size:10px;color:var(--accent2);text-decoration:none;background:rgba(0,212,255,0.08);border:1px solid rgba(0,212,255,0.2);border-radius:4px;padding:2px 8px;">${alert.linkText}</a>
-    </div>`;
-  div.onclick = () => window.open(alert.link, '_blank');
+  div.innerHTML = `<div class="alert-type">${alert.type}</div><div class="alert-text">${alert.text}</div><div class="alert-time">${now}</div>`;
   alertList.insertBefore(div, alertList.firstChild);
+  // Keep max 5
   while(alertList.children.length > 5) alertList.removeChild(alertList.lastChild);
   alertCount++;
   document.getElementById('alertCount').textContent = alertCount + ' 条';
@@ -1460,8 +1427,7 @@ function selectSource(src, el) {
     `<div class="guide-step"><div class="guide-num">${i+1}</div><span>${s}</span></div>`
   ).join('');
 }
-const _srcFeigua = document.getElementById('src-feigua');
-if (_srcFeigua) selectSource('feigua', _srcFeigua);
+selectSource('feigua', document.getElementById('src-feigua'));
 
 document.getElementById('pasteArea').addEventListener('input', function() {
   pastedData = this.value;
@@ -1703,467 +1669,14 @@ setInterval(()=>{
   document.getElementById('clockPill').textContent = new Date().toLocaleTimeString('zh-CN');
 },1000);
 
-// ============ VIDEO URL ANALYSIS ============
-let currentVideoStructure = '';
-let selectedProductType = '';
-
-function fillUrlExample(val) {
-  if(val === 'paste') {
-    document.getElementById('videoUrlInput').value = '没有链接，我来描述：';
-    document.getElementById('videoUrlInput').focus();
-  } else {
-    document.getElementById('videoUrlInput').value = val;
-    analyzeVideoUrl();
-  }
-}
-
-function selectProductType(btn, type) {
-  document.querySelectorAll('.product-type-btn').forEach(b => b.className='btn btn-ghost btn-sm product-type-btn');
-  btn.className = 'btn btn-red btn-sm product-type-btn';
-  selectedProductType = type;
-}
-
-async function analyzeVideoUrl() {
-  const input = document.getElementById('videoUrlInput').value.trim();
-  if(!input) { showToast('请输入视频链接或标题描述'); return; }
-
-  const aiChat = document.getElementById('aiChat');
-  if(aiChat.querySelector('.empty')) aiChat.innerHTML='';
-
-  // Show result area with loading
-  document.getElementById('az-result').style.display = 'block';
-  document.getElementById('videoInfoCard').innerHTML = `
-    <div class="card-hd"><div class="card-title">📹 视频信息</div></div>
-    <div class="card-body" style="display:flex;gap:8px;align-items:center;color:var(--muted);font-size:12px;">
-      <div class="ld"></div><div class="ld"></div><div class="ld"></div>&nbsp;正在获取视频信息...
-    </div>`;
-  document.getElementById('structureCard').innerHTML = `
-    <div class="card-hd"><div class="card-title">🧩 爆款结构拆解</div></div>
-    <div class="card-body" style="display:flex;gap:8px;align-items:center;color:var(--muted);font-size:12px;">
-      <div class="ld"></div><div class="ld"></div><div class="ld"></div>&nbsp;AI正在深度拆解内容结构...
-    </div>`;
-  document.getElementById('newScriptCard').style.display = 'none';
-
-  addMsg('user', `请帮我拆解这个视频：${input}`);
-  const loadEl = addLoadingMsg();
-
-  const _aiKey = localStorage.getItem('anthropic_key') || localStorage.getItem('ds_key') || '';
-
-  const isUrl = input.startsWith('http');
-  const prompt = `你是顶级抖音爆款内容拆解专家。
-
-${isUrl ? `用户提供了视频链接：${input}` : `用户描述了一个视频：${input}`}
-
-请完成以下拆解（JSON格式回复，方便程序解析）：
-
-{
-  "title": "视频标题（如能从链接推断）或用户描述的标题",
-  "platform": "抖音",
-  "why_viral": "爆火核心原因（1句话）",
-  "hook": "开场钩子/前3秒吸引点",
-  "structure": [
-    {"step": 1, "name": "开场", "duration": "0-5秒", "content": "具体内容", "technique": "使用的技巧"},
-    {"step": 2, "name": "痛点/共鸣", "duration": "5-15秒", "content": "具体内容", "technique": "使用的技巧"},
-    {"step": 3, "name": "价值呈现", "duration": "15-40秒", "content": "具体内容", "technique": "使用的技巧"},
-    {"step": 4, "name": "结尾钩子", "duration": "最后5秒", "content": "具体内容", "technique": "使用的技巧"}
-  ],
-  "emotion": "核心情绪价值（如：好奇/共鸣/惊喜）",
-  "title_formula": "标题公式（如：[数字]+[痛点]+[解决方案]）",
-  "replication_tips": "复刻时最需要保留的3个关键点"
-}
-
-只输出JSON，不要其他文字。`;
-
-  try {
-    const res = await fetch('/api/tikhub', {
-      method:'POST',
-      headers:{'Content-Type':'application/json','x-anthropic-key': _aiKey},
-      body: JSON.stringify({
-        model:'claude-sonnet-4-20250514',
-        max_tokens:1500,
-        messages:[{role:'user',content:prompt}]
-      })
-    });
-    const d = await res.json();
-    const text = d.content?.[0]?.text || '';
-
-    let data;
-    try {
-      const clean = text.replace(/```json|```/g,'').trim();
-      data = JSON.parse(clean);
-    } catch(e) {
-      data = { title: input.slice(0,40), why_viral: text.slice(0,100), structure: [], hook: '', emotion: '', title_formula: '', replication_tips: '' };
-    }
-
-    currentVideoStructure = JSON.stringify(data);
-    chatHistory = [{role:'user',content:prompt},{role:'assistant',content:text}];
-
-    // Render video info card
-    document.getElementById('videoInfoCard').innerHTML = `
-      <div class="card-hd">
-        <div class="card-title">📹 视频信息</div>
-        ${isUrl ? `<a href="${input}" target="_blank" class="btn btn-ghost btn-sm">🔗 查看原视频</a>` : ''}
-      </div>
-      <div class="card-body">
-        <div style="font-size:14px;font-weight:700;margin-bottom:10px;">${data.title || '未知标题'}</div>
-        <div style="display:flex;gap:20px;flex-wrap:wrap;">
-          <div><div style="font-size:10px;color:var(--muted);margin-bottom:3px;">爆火原因</div><div style="font-size:12px;color:var(--accent);">${data.why_viral||'—'}</div></div>
-          <div><div style="font-size:10px;color:var(--muted);margin-bottom:3px;">核心情绪</div><div style="font-size:12px;color:var(--accent2);">${data.emotion||'—'}</div></div>
-          <div><div style="font-size:10px;color:var(--muted);margin-bottom:3px;">开场钩子</div><div style="font-size:12px;color:var(--gold);">${data.hook||'—'}</div></div>
-        </div>
-        <div style="margin-top:10px;background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.2);border-radius:6px;padding:8px 12px;">
-          <span style="font-size:10px;color:var(--accent3);font-family:\'IBM Plex Mono\',monospace;">标题公式：</span>
-          <span style="font-size:12px;color:var(--text);">${data.title_formula||'—'}</span>
-        </div>
-      </div>`;
-
-    // Render structure card
-    const stepsHtml = (data.structure||[]).map(s => `
-      <div style="display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);">
-        <div style="width:24px;height:24px;background:var(--accent);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:white;flex-shrink:0;">${s.step}</div>
-        <div style="flex:1;">
-          <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px;">
-            <span style="font-size:12px;font-weight:700;">${s.name}</span>
-            <span style="font-size:10px;color:var(--muted);font-family:\'IBM Plex Mono\',monospace;">${s.duration}</span>
-          </div>
-          <div style="font-size:12px;color:var(--text);line-height:1.6;">${s.content}</div>
-          <div style="font-size:10px;color:var(--accent2);margin-top:3px;">技巧：${s.technique}</div>
-        </div>
-      </div>`).join('');
-
-    document.getElementById('structureCard').innerHTML = `
-      <div class="card-hd">
-        <div class="card-title">🧩 爆款结构拆解</div>
-        <span class="tag blue">可复刻</span>
-      </div>
-      <div class="card-body">
-        ${stepsHtml}
-        <div style="margin-top:12px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);border-radius:6px;padding:10px 12px;">
-          <div style="font-size:10px;color:var(--green);margin-bottom:4px;font-family:\'IBM Plex Mono\',monospace;">复刻时必须保留</div>
-          <div style="font-size:12px;line-height:1.7;">${data.replication_tips||'—'}</div>
-        </div>
-      </div>`;
-
-    loadEl.innerHTML = `<div class="msg-lbl">▸ AI 分析师</div><div class="msg-bubble">✅ 拆解完成！我已分析出这个视频的完整结构。<br><br><strong>核心亮点：</strong>${data.why_viral}<br><br>现在请在下方选择你的产品类型，填入产品名称，我会为你生成专属的复刻脚本 ✨</div>`;
-    aiChat.scrollTop = 99999;
-
-  } catch(e) {
-    document.getElementById('structureCard').innerHTML = `<div class="card-body" style="color:var(--accent);font-size:13px;">⚠️ 分析失败：${e.message}，请检查AI Key配置</div>`;
-    loadEl.innerHTML = `<div class="msg-lbl">▸ AI 分析师</div><div class="msg-bubble" style="color:var(--accent)">⚠️ 连接失败，请检查Anthropic API Key是否配置</div>`;
-  }
-}
-
-async function replicateWithProduct() {
-  const product = document.getElementById('myProductInput').value.trim();
-  if(!product) { showToast('请填写你的产品名称'); return; }
-  if(!currentVideoStructure) { showToast('请先完成视频拆解'); return; }
-  if(!selectedProductType) { showToast('请选择产品类型'); return; }
-
-  const newScriptCard = document.getElementById('newScriptCard');
-  newScriptCard.style.display = 'block';
-  newScriptCard.innerHTML = `
-    <div class="card">
-      <div class="card-hd"><div class="card-title">✨ 正在生成复刻脚本...</div></div>
-      <div class="card-body" style="display:flex;gap:8px;align-items:center;color:var(--muted);font-size:12px;">
-        <div class="ld"></div><div class="ld"></div><div class="ld"></div>
-        &nbsp;AI正在全网搜索「${product}」的核心买点，并按爆款结构重新创作...
-      </div>
-    </div>`;
-
-  newScriptCard.scrollIntoView({behavior:'smooth', block:'start'});
-  addMsg('user', `我的产品是「${product}」（${selectedProductType}类），请按照刚才拆解的爆款结构，为我生成复刻脚本`);
-  const loadEl = addLoadingMsg();
-
-  const _aiKey = localStorage.getItem('anthropic_key') || localStorage.getItem('ds_key') || '';
-  const structure = JSON.parse(currentVideoStructure);
-
-  const prompt = `你是顶级抖音爆款内容创作专家，擅长把爆款结构复刻到新产品上。
-
-用户产品：${product}
-产品类型：${selectedProductType}
-
-已拆解的爆款结构：
-${JSON.stringify(structure, null, 2)}
-
-任务：
-1. 首先，根据你的知识总结「${product}」的3-5个核心买点/卖点（模拟全网搜索）
-2. 然后，严格按照上方爆款结构的每个步骤，把这个产品的内容填进去，生成完整的新视频脚本
-3. 保留原结构的情绪价值、节奏感和技巧，只替换具体内容为这个产品
-
-输出格式：
-**【${product}的核心买点】**
-- 买点1：...
-- 买点2：...
-- 买点3：...
-
-**【复刻脚本】**
-**标题：**（按原标题公式改写）
-
-**第1步 - 开场（0-5秒）：**
-画面：[具体拍摄内容]
-台词/文案：[具体说的话]
-
-**第2步 - [步骤名]（时长）：**
-画面：[具体拍摄内容]  
-台词/文案：[具体说的话]
-
-（以此类推，完整覆盖所有步骤）
-
-**拍摄建议：**（3条具体可执行的建议）
-
-请用专业但接地气的语言，让普通人一看就能拍。`;
-
-  try {
-    const res = await fetch('/api/tikhub', {
-      method:'POST',
-      headers:{'Content-Type':'application/json','x-anthropic-key': _aiKey},
-      body: JSON.stringify({
-        model:'claude-sonnet-4-20250514',
-        max_tokens:2000,
-        messages:[...chatHistory, {role:'user',content:prompt}]
-      })
-    });
-    const d = await res.json();
-    const reply = d.content?.[0]?.text || '生成失败';
-    chatHistory.push({role:'user',content:prompt},{role:'assistant',content:reply});
-
-    const formatted = reply.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
-
-    newScriptCard.innerHTML = `
-      <div class="card">
-        <div class="card-hd">
-          <div class="card-title">✨ 复刻脚本 · ${product}</div>
-          <div style="display:flex;gap:6px;">
-            <span class="tag green">已完成</span>
-            <button class="btn btn-ghost btn-sm" onclick="copyScript()">📋 复制脚本</button>
-          </div>
-        </div>
-        <div class="card-body" style="font-size:12px;line-height:1.9;" id="scriptContent">
-          ${formatted}
-        </div>
-      </div>`;
-
-    loadEl.innerHTML = `<div class="msg-lbl">▸ AI 分析师</div><div class="msg-bubble">🎉 复刻脚本生成完成！<br><br>我已经：<br>✅ 搜索了「${product}」的核心买点<br>✅ 按照爆款结构重新创作<br>✅ 保留了原视频的情绪价值和节奏感<br><br>如需调整，随时告诉我！</div>`;
-    document.getElementById('aiChat').scrollTop = 99999;
-
-  } catch(e) {
-    newScriptCard.innerHTML = `<div class="card"><div class="card-body" style="color:var(--accent);">⚠️ 生成失败：${e.message}</div></div>`;
-    loadEl.innerHTML = `<div class="msg-lbl">▸ AI 分析师</div><div class="msg-bubble" style="color:var(--accent)">⚠️ 生成失败，请重试</div>`;
-  }
-}
-
-function copyScript() {
-  const el = document.getElementById('scriptContent');
-  const text = el ? el.innerText : '';
-  navigator.clipboard.writeText(text).then(() => showToast('脚本已复制到剪贴板！'));
-}
-
-// ============ ACCOUNT MONITORING ============
-let monitoredAccounts = JSON.parse(localStorage.getItem('monitored_accounts') || '[]');
-let selectedAccountId = null;
-
-function openAddAccountModal() {
-  document.getElementById('addAccountModal').style.display = 'flex';
-  document.getElementById('addAccountInput').value = '';
-  document.getElementById('addAccountError').style.display = 'none';
-  setTimeout(() => document.getElementById('addAccountInput').focus(), 100);
-}
-
-async function confirmAddAccount() {
-  const uid = document.getElementById('addAccountInput').value.trim();
-  const errEl = document.getElementById('addAccountError');
-  if(!uid) { errEl.style.display='block'; errEl.textContent='请输入抖音号'; return; }
-
-  const key = localStorage.getItem('tikhub_key') || localStorage.getItem('ds_key') || '';
-  if(!key) { errEl.style.display='block'; errEl.textContent='请先在「数据源」中配置TikHub Key'; return; }
-
-  errEl.style.display = 'none';
-  const btn = document.querySelector('[onclick="confirmAddAccount()"]');
-  if(btn) { btn.textContent = '⏳ 查询中...'; btn.disabled = true; }
-
-  try {
-    const r = await fetch(`/api/tikhub?endpoint=user_info&unique_id=${encodeURIComponent(uid)}`, {
-      headers: { 'x-api-key': key }
-    });
-    const j = await r.json();
-    if(!j?.success || !j?.user) {
-      errEl.style.display = 'block';
-      errEl.textContent = j?.error || '未找到该账号，请检查抖音号是否正确';
-      return;
-    }
-    const user = j.user;
-    // 检查是否已添加
-    if(monitoredAccounts.find(a => a.uniqueId === user.uniqueId)) {
-      errEl.style.display='block'; errEl.textContent='该账号已在监测列表中'; return;
-    }
-    monitoredAccounts.push({
-      ...user,
-      addedAt: Date.now(),
-      lastChecked: Date.now(),
-      prevVideoCount: user.awemeCount || 0,
-      alerts: [],
-    });
-    localStorage.setItem('monitored_accounts', JSON.stringify(monitoredAccounts));
-    document.getElementById('addAccountModal').style.display = 'none';
-    renderAccountList();
-    viewAccount(monitoredAccounts.length - 1);
-    showToast(`✅ 已添加监测：${user.nickname}`);
-  } catch(e) {
-    errEl.style.display='block'; errEl.textContent = '查询失败：' + e.message;
-  } finally {
-    if(btn) { btn.textContent = '🔍 查询并添加'; btn.disabled = false; }
-  }
-}
-
-function renderAccountList() {
-  const el = document.getElementById('accountList');
-  if(monitoredAccounts.length === 0) {
-    el.innerHTML = `<div class="empty" style="padding:40px 0;"><div class="empty-icon">👤</div><div class="empty-text">还没有监测账号<br>点击右上角「添加账号」</div></div>`;
-    return;
-  }
-  el.innerHTML = monitoredAccounts.map((a, i) => `
-    <div onclick="viewAccount(${i})" style="background:var(--surface);border:1px solid ${selectedAccountId===i?'var(--accent)':'var(--border)'};border-radius:10px;padding:12px 14px;cursor:pointer;transition:all 0.15s;margin-bottom:8px;" onmouseover="this.style.borderColor='var(--accent2)'" onmouseout="this.style.borderColor='${selectedAccountId===i?'var(--accent)':'var(--border)'}'">
-      <div style="display:flex;align-items:center;gap:10px;">
-        <div style="width:36px;height:36px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;overflow:hidden;">
-          ${a.avatarUrl ? `<img src="${a.avatarUrl}" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.innerHTML='👤'">` : '👤'}
-        </div>
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${a.nickname || a.uniqueId}</div>
-          <div style="font-size:10px;color:var(--muted);margin-top:1px;">@${a.uniqueId} · ${fmtNum(a.followerCount)}粉</div>
-        </div>
-        ${a.alerts.length > 0 ? `<div style="width:18px;height:18px;background:var(--accent);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:white;">${a.alerts.length}</div>` : ''}
-      </div>
-    </div>`).join('');
-}
-
-function fmtNum(n) {
-  n = parseInt(n||0);
-  return n>=1e8?(n/1e8).toFixed(1)+'亿':n>=1e4?(n/1e4).toFixed(1)+'万':n>=1e3?(n/1e3).toFixed(0)+'k':String(n);
-}
-
-async function viewAccount(idx) {
-  selectedAccountId = idx;
-  renderAccountList();
-  const a = monitoredAccounts[idx];
-  const el = document.getElementById('accountDetail');
-
-  el.innerHTML = `
-    <div class="card" style="margin-bottom:14px;">
-      <div class="card-hd">
-        <div style="display:flex;align-items:center;gap:12px;">
-          <div style="width:48px;height:48px;border-radius:50%;background:var(--surface2);overflow:hidden;flex-shrink:0;">
-            ${a.avatarUrl ? `<img src="${a.avatarUrl}" style="width:100%;height:100%;object-fit:cover;" onerror="this.src=''">` : '<div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:24px;">👤</div>'}
-          </div>
-          <div>
-            <div style="font-size:15px;font-weight:700;">${a.nickname || a.uniqueId}</div>
-            <div style="font-size:11px;color:var(--muted);margin-top:2px;">@${a.uniqueId}${a.verified?' · '+a.verified:''}</div>
-          </div>
-        </div>
-        <div style="display:flex;gap:8px;">
-          <a href="https://www.douyin.com/user/${a.uid||''}" target="_blank" class="btn btn-ghost btn-sm">🔗 主页</a>
-          <button class="btn btn-ghost btn-sm" onclick="refreshAccount(${idx})">↻ 刷新</button>
-          <button class="btn btn-ghost btn-sm" style="color:var(--accent);" onclick="removeAccount(${idx})">删除</button>
-        </div>
-      </div>
-      <div class="card-body">
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;text-align:center;">
-          <div><div style="font-size:18px;font-weight:800;color:var(--accent2);">${fmtNum(a.followerCount)}</div><div style="font-size:10px;color:var(--muted);margin-top:2px;">粉丝</div></div>
-          <div><div style="font-size:18px;font-weight:800;color:var(--accent);">${fmtNum(a.awemeCount)}</div><div style="font-size:10px;color:var(--muted);margin-top:2px;">作品</div></div>
-          <div><div style="font-size:18px;font-weight:800;color:var(--gold);">${fmtNum(a.totalFavorited)}</div><div style="font-size:10px;color:var(--muted);margin-top:2px;">获赞</div></div>
-          <div><div style="font-size:18px;font-weight:800;color:var(--green);">${fmtNum(a.followingCount)}</div><div style="font-size:10px;color:var(--muted);margin-top:2px;">关注</div></div>
-        </div>
-        ${a.signature ? `<div style="margin-top:12px;font-size:11px;color:var(--muted);line-height:1.7;padding:8px 12px;background:var(--surface2);border-radius:6px;">${a.signature}</div>` : ''}
-      </div>
-    </div>
-
-    ${a.alerts.length > 0 ? `
-    <div class="card" style="margin-bottom:14px;">
-      <div class="card-hd"><div class="card-title">🔔 爆款预警</div><span style="font-size:10px;color:var(--accent);font-family:'IBM Plex Mono',monospace;">${a.alerts.length} 条</span></div>
-      <div class="card-body" style="display:flex;flex-direction:column;gap:8px;">
-        ${a.alerts.map(al => `
-          <div style="background:rgba(255,51,85,0.06);border:1px solid rgba(255,51,85,0.2);border-radius:8px;padding:10px 12px;">
-            <div style="font-size:11px;color:var(--accent);font-family:'IBM Plex Mono',monospace;margin-bottom:4px;">${al.time}</div>
-            <div style="font-size:12px;line-height:1.6;">${al.text}</div>
-            ${al.url ? `<a href="${al.url}" target="_blank" style="font-size:10px;color:var(--accent2);text-decoration:none;">查看视频 →</a>` : ''}
-          </div>`).join('')}
-      </div>
-    </div>` : ''}
-
-    <div class="card">
-      <div class="card-hd">
-        <div class="card-title">📊 监测状态</div>
-        <span style="font-size:10px;color:var(--muted);font-family:'IBM Plex Mono',monospace;">上次检查：${new Date(a.lastChecked).toLocaleTimeString('zh-CN')}</span>
-      </div>
-      <div class="card-body" style="font-size:12px;color:var(--muted);line-height:1.9;">
-        ✅ 正在监测中，每次点击「刷新」或应用自动刷新时会检查该账号<br>
-        🔔 一旦作品数量增加，会自动生成爆款预警提醒<br>
-        📈 当前作品数：${a.awemeCount} 个<br>
-        <div style="margin-top:10px;">
-          <button class="btn btn-red btn-sm" onclick="checkAccountForNew(${idx})">🔍 立即检查是否有新作品</button>
-        </div>
-      </div>
-    </div>`;
-}
-
-async function refreshAccount(idx) {
-  const a = monitoredAccounts[idx];
-  const key = localStorage.getItem('tikhub_key') || localStorage.getItem('ds_key') || '';
-  if(!key) { showToast('请先配置TikHub Key'); return; }
-
-  showToast('正在刷新账号数据...');
-  try {
-    const r = await fetch(`/api/tikhub?endpoint=user_info&unique_id=${encodeURIComponent(a.uniqueId)}`, {
-      headers: { 'x-api-key': key }
-    });
-    const j = await r.json();
-    if(j?.success && j?.user) {
-      const prev = monitoredAccounts[idx].awemeCount || 0;
-      Object.assign(monitoredAccounts[idx], j.user, { lastChecked: Date.now() });
-      const curr = j.user.awemeCount || 0;
-      if(curr > prev) {
-        const diff = curr - prev;
-        monitoredAccounts[idx].alerts.unshift({
-          time: new Date().toLocaleString('zh-CN'),
-          text: `🔥 发现 ${diff} 个新视频！作品总数从 ${prev} 增加到 ${curr}，请立即查看是否有爆款`,
-          url: `https://www.douyin.com/user/${j.user.uid||''}`,
-        });
-        showToast(`🔔 ${a.nickname} 发布了 ${diff} 个新视频！`);
-      } else {
-        showToast(`✅ ${j.user.nickname} 数据已更新，暂无新作品`);
-      }
-      localStorage.setItem('monitored_accounts', JSON.stringify(monitoredAccounts));
-      viewAccount(idx);
-    }
-  } catch(e) { showToast('刷新失败：' + e.message); }
-}
-
-async function checkAccountForNew(idx) {
-  await refreshAccount(idx);
-}
-
-function removeAccount(idx) {
-  const name = monitoredAccounts[idx].nickname;
-  monitoredAccounts.splice(idx, 1);
-  localStorage.setItem('monitored_accounts', JSON.stringify(monitoredAccounts));
-  selectedAccountId = null;
-  document.getElementById('accountDetail').innerHTML = `<div class="empty" style="padding:80px 0;"><div class="empty-icon">📊</div><div class="empty-text">选择左侧账号<br>查看实时监测数据</div></div>`;
-  renderAccountList();
-  showToast(`已删除：${name}`);
-}
-
-// 初始化账号列表
-renderAccountList();
-
-
 
 // ═══════════════════════════════════════════════════════════════
 // v4 真实数据引擎
 // ═══════════════════════════════════════════════════════════════
-// _ds 变量已在文件顶部声明，此处重新从 localStorage 读取最新值
-_dsSource    = localStorage.getItem('ds_source') || null;
-_dsKey       = localStorage.getItem('ds_key')    || null;
-_dsConnected = false;
-_dsSelectedSource = _dsSource || 'tikhub';
+let _dsSource    = localStorage.getItem('ds_source') || null;
+let _dsKey       = localStorage.getItem('ds_key')    || null;
+let _dsConnected = false;
+let _dsSelectedSource = _dsSource || 'tikhub';
 
 const TRACK_KEYWORDS = {
   '美食':['美食','探店','做饭','料理'],

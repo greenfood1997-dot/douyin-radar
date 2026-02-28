@@ -16,6 +16,26 @@ function err(msg, status = 400) {
   return new Response(JSON.stringify({ success: false, error: msg }), { status, headers: CORS });
 }
 
+// 从响应中提取热搜列表（穷举所有可能位置）
+function extractHotList(json) {
+  const d = json?.data;
+  if (!d) return [];
+  // data.data 可能是数组或对象
+  if (Array.isArray(d.data)) return d.data;
+  if (d.data && typeof d.data === 'object') {
+    // 在子对象里找数组
+    for (const k of Object.keys(d.data)) {
+      if (Array.isArray(d.data[k]) && d.data[k].length > 0) return d.data[k];
+    }
+  }
+  if (Array.isArray(d.word_list)) return d.word_list;
+  if (Array.isArray(d.sentence_list)) return d.sentence_list;
+  if (Array.isArray(d.hot_list)) return d.hot_list;
+  if (Array.isArray(d.list)) return d.list;
+  if (Array.isArray(d)) return d;
+  return [];
+}
+
 export default async function handler(req) {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
 
@@ -32,18 +52,29 @@ export default async function handler(req) {
   try {
 
     // ════════════════════════════════════════
-    // 抖音热搜榜
+    // 热搜榜
     // ════════════════════════════════════════
     if (endpoint === 'hot_search') {
       const res = await fetch(`${BASE}/api/v1/douyin/app/v3/fetch_hot_search_list`, { headers: authHeaders });
       const json = await res.json();
-      const list = json?.data?.data;
+
+      if (json?.code !== 200) {
+        return err('TikHub API error: ' + (json?.message_zh || json?.message || json?.code), 502);
+      }
+
+      const list = extractHotList(json);
 
       if (!list || list.length === 0) {
         return ok({
           type: 'hot_search', title: '抖音热搜榜',
           updateTime: new Date().toLocaleString('zh-CN'), items: [],
-          _debug: JSON.stringify(json?.data || {}).slice(0, 400),
+          _debug: {
+            dataType: typeof json?.data?.data,
+            isArray: Array.isArray(json?.data?.data),
+            dataKeys: Object.keys(json?.data || {}),
+            dataDotDataKeys: json?.data?.data && typeof json.data.data === 'object' ? Object.keys(json.data.data) : [],
+            sample: JSON.stringify(json?.data).slice(0, 500),
+          }
         });
       }
 
@@ -52,7 +83,7 @@ export default async function handler(req) {
         updateTime: new Date().toLocaleString('zh-CN'),
         items: list.map((item, idx) => ({
           rank: idx + 1,
-          word: item.word || item.sentence || item.hot_value_desc || item.title || item.name || '',
+          word: item.word || item.sentence || item.hot_value_desc || item.title || item.name || item.query || '',
           hotValue: item.hot_value || item.event_count || item.hot_score || item.score || 0,
           label: item.label_name || item.sentence_label || item.label || item.tag || '',
           coverUrl: item.cover_url || item.cover?.url_list?.[0] || '',
@@ -61,14 +92,12 @@ export default async function handler(req) {
     }
 
     // ════════════════════════════════════════
-    // 关键词搜索视频 - 多接口fallback
+    // 关键词搜索视频 - 多接口 fallback
     // ════════════════════════════════════════
     else if (endpoint === 'search') {
       if (!keyword) return err('请提供 keyword 参数');
 
       const kw = encodeURIComponent(keyword);
-
-      // 依次尝试多个接口
       const searchUrls = [
         `${BASE}/api/v1/douyin/app/v3/fetch_search_result?keyword=${kw}&count=20`,
         `${BASE}/api/v1/douyin/app/v3/fetch_video_search_result?keyword=${kw}&count=20`,
@@ -77,35 +106,21 @@ export default async function handler(req) {
       ];
 
       let json = null;
-      let usedUrl = '';
       for (const url of searchUrls) {
         try {
           const r = await fetch(url, { headers: authHeaders });
           const j = await r.json();
-          if (j?.code === 200) { json = j; usedUrl = url; break; }
+          if (j?.code === 200) { json = j; break; }
         } catch(e) { continue; }
       }
 
-      if (!json) {
-        return ok({
-          type: 'search', keyword,
-          title: `"${keyword}" 搜索结果`,
-          updateTime: new Date().toLocaleString('zh-CN'),
-          items: [],
-          _debug: 'all search endpoints failed'
-        });
-      }
+      if (!json) return ok({ type: 'search', keyword, title: `"${keyword}" 搜索结果`, updateTime: new Date().toLocaleString('zh-CN'), items: [] });
 
-      const list = json?.data?.aweme_list || json?.data?.data || [];
+      const rawList = json?.data?.aweme_list || json?.data?.data;
+      const list = Array.isArray(rawList) ? rawList : [];
 
-      if (!list || list.length === 0) {
-        return ok({
-          type: 'search', keyword,
-          title: `"${keyword}" 搜索结果`,
-          updateTime: new Date().toLocaleString('zh-CN'),
-          items: [],
-          _debug: JSON.stringify(json?.data || {}).slice(0, 400),
-        });
+      if (list.length === 0) {
+        return ok({ type: 'search', keyword, title: `"${keyword}" 搜索结果`, updateTime: new Date().toLocaleString('zh-CN'), items: [] });
       }
 
       return ok({
@@ -166,13 +181,16 @@ export default async function handler(req) {
     else if (endpoint === 'debug') {
       const res = await fetch(`${BASE}/api/v1/douyin/app/v3/fetch_hot_search_list`, { headers: authHeaders });
       const json = await res.json();
-      const list = json?.data?.data;
+      const extracted = extractHotList(json);
       return ok({
         type: 'debug', httpStatus: res.status,
         tikhubCode: json?.code,
         dataKeys: Object.keys(json?.data || {}),
-        listLength: list?.length || 0,
-        firstItem: list?.[0] ? JSON.stringify(list[0]).slice(0, 300) : 'empty',
+        dataDataType: typeof json?.data?.data,
+        dataDataIsArray: Array.isArray(json?.data?.data),
+        dataDataKeys: (json?.data?.data && typeof json.data.data === 'object' && !Array.isArray(json.data.data)) ? Object.keys(json.data.data) : [],
+        extractedCount: extracted.length,
+        firstItem: extracted[0] ? JSON.stringify(extracted[0]).slice(0, 300) : 'empty',
       });
     }
 

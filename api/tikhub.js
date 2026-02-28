@@ -38,21 +38,21 @@ export default async function handler(req) {
       const res = await fetch(`${BASE}/api/v1/douyin/app/v3/fetch_hot_search_list`, { headers: authHeaders });
       const json = await res.json();
 
-      // ⚠️ 检查 TikHub 是否返回业务错误
       if (json?.code !== 200) {
-        return err(
-          json?.message_zh || json?.message || 'TikHub API 返回错误',
-          502,
-          { tikhub_code: json?.code, raw: JSON.stringify(json).slice(0, 300) }
-        );
+        return err(json?.message_zh || json?.message || 'TikHub API 返回错误', 502,
+          { tikhub_code: json?.code, raw: JSON.stringify(json).slice(0, 300) });
       }
 
-      // ✅ 兼容多种可能的列表字段名
-      const list = json?.data?.word_list
-        || json?.data?.data
-        || json?.data?.sentence_list
-        || json?.data?.hot_list
-        || [];
+      // data.data 是嵌套对象，热搜列表在更深层
+      // 结构: json.data.data.sentence_list 或 json.data.data (数组)
+      const dataData = json?.data?.data;
+      const list = Array.isArray(dataData)
+        ? dataData                                        // data.data 本身就是数组
+        : dataData?.sentence_list                         // data.data.sentence_list
+          || dataData?.word_list                          // data.data.word_list
+          || dataData?.hot_list                           // data.data.hot_list
+          || json?.data?.word_list                        // data.word_list (备用)
+          || [];
 
       if (!list || list.length === 0) {
         return ok({
@@ -60,7 +60,13 @@ export default async function handler(req) {
           title: '抖音热搜榜',
           updateTime: new Date().toLocaleString('zh-CN'),
           items: [],
-          _debug: JSON.stringify(json?.data || {}).slice(0, 400),
+          // 把完整的 data.data 结构暴露出来方便调试
+          _debug: {
+            dataDataType: typeof dataData,
+            dataDataIsArray: Array.isArray(dataData),
+            dataDataKeys: dataData && typeof dataData === 'object' ? Object.keys(dataData) : [],
+            sample: JSON.stringify(dataData).slice(0, 500),
+          },
         });
       }
 
@@ -92,29 +98,20 @@ export default async function handler(req) {
       const json = await res.json();
 
       if (json?.code !== 200) {
-        return err(
-          json?.message_zh || json?.message || 'TikHub API 返回错误',
-          502,
-          { tikhub_code: json?.code, raw: JSON.stringify(json).slice(0, 300) }
-        );
+        return err(json?.message_zh || json?.message || 'TikHub API 返回错误', 502,
+          { tikhub_code: json?.code, raw: JSON.stringify(json).slice(0, 300) });
       }
 
       const list = json?.data?.aweme_list || json?.data?.data || [];
 
       if (!list || list.length === 0) {
-        return ok({
-          type: 'search', keyword,
-          title: `"${keyword}" 搜索结果`,
-          updateTime: new Date().toLocaleString('zh-CN'),
-          items: [],
-          _debug: JSON.stringify(json?.data || {}).slice(0, 400),
-        });
+        return ok({ type: 'search', keyword, title: `"${keyword}" 搜索结果`,
+          updateTime: new Date().toLocaleString('zh-CN'), items: [],
+          _debug: JSON.stringify(json?.data || {}).slice(0, 400) });
       }
 
       return ok({
-        type: 'search',
-        keyword,
-        title: `"${keyword}" 搜索结果`,
+        type: 'search', keyword, title: `"${keyword}" 搜索结果`,
         updateTime: new Date().toLocaleString('zh-CN'),
         items: list.map(item => {
           const v = item.aweme_info || item;
@@ -145,19 +142,15 @@ export default async function handler(req) {
       const json = await res.json();
 
       if (json?.code !== 200) {
-        return err(
-          json?.message_zh || json?.message || 'TikHub API 返回错误',
-          502,
-          { tikhub_code: json?.code, raw: JSON.stringify(json).slice(0, 300) }
-        );
+        return err(json?.message_zh || json?.message || 'TikHub API 返回错误', 502,
+          { tikhub_code: json?.code, raw: JSON.stringify(json).slice(0, 300) });
       }
 
       const u = json?.data?.user || json?.data || {};
       if (!u.nickname && !u.uid) return err('未找到该用户');
 
       return ok({
-        type: 'user_info',
-        title: '达人信息',
+        type: 'user_info', title: '达人信息',
         updateTime: new Date().toLocaleString('zh-CN'),
         user: {
           nickname: u.nickname || '',
@@ -176,14 +169,17 @@ export default async function handler(req) {
     }
 
     // ════════════════════════════════════════
-    // 诊断接口 —— 自动探测数据结构，方便排查
+    // 诊断接口 —— 深度探测 data.data 结构
     // ════════════════════════════════════════
     else if (endpoint === 'debug') {
       const res = await fetch(`${BASE}/api/v1/douyin/app/v3/fetch_hot_search_list`, { headers: authHeaders });
       const json = await res.json();
-      const dataKeys = Object.keys(json?.data || {});
-      const listField = dataKeys.find(k => Array.isArray(json.data[k]));
-      const list = listField ? json.data[listField] : null;
+
+      const dataData = json?.data?.data;
+      const isArray = Array.isArray(dataData);
+      const subKeys = (!isArray && dataData && typeof dataData === 'object') ? Object.keys(dataData) : [];
+      const subListField = subKeys.find(k => Array.isArray(dataData[k]));
+      const list = isArray ? dataData : (subListField ? dataData[subListField] : null);
 
       return ok({
         type: 'debug',
@@ -191,11 +187,15 @@ export default async function handler(req) {
         tikhubCode: json?.code,
         tikhubMessage: json?.message_zh || json?.message,
         topKeys: Object.keys(json || {}),
-        dataKeys,
-        detectedListField: listField || 'none',     // ← 告诉你列表在哪个字段
+        dataKeys: Object.keys(json?.data || {}),
+        // 关键：data.data 的详情
+        dataData_isArray: isArray,
+        dataData_type: typeof dataData,
+        dataData_subKeys: subKeys,
+        dataData_detectedListField: subListField || (isArray ? '(itself)' : 'none'),
         listLength: list?.length || 0,
         firstItem: list?.[0] ? JSON.stringify(list[0]).slice(0, 400) : 'empty',
-        rawDataSample: JSON.stringify(json?.data || {}).slice(0, 600),
+        rawDataSample: JSON.stringify(json?.data || {}).slice(0, 800),
       });
     }
 

@@ -1732,27 +1732,56 @@ async function fetchViaTikHub(keyword) {
   const key = localStorage.getItem('tikhub_key') || localStorage.getItem('ds_key') || _dsKey;
   if (!key) return null;
 
-  const endpoints = [
-    `/api/tikhub?keyword=${encodeURIComponent(keyword)}&token=${encodeURIComponent(key)}`,
-    `/api/tikhub?endpoint=hot&token=${encodeURIComponent(key)}`,
+  // 先尝试关键词搜索，再fallback到热搜榜
+  const requests = [
+    { url: `/api/tikhub?endpoint=search&keyword=${encodeURIComponent(keyword)}`, type: 'search' },
+    { url: `/api/tikhub?endpoint=hot_search`, type: 'hot_search' },
   ];
 
-  for (const url of endpoints) {
+  for (const req of requests) {
     try {
       const controller = new AbortController();
-      setTimeout(() => controller.abort(), 12000);
-      const r = await fetch(url, { signal: controller.signal });
-      if (!r.ok) continue;
+      setTimeout(() => controller.abort(), 15000);
+      const r = await fetch(req.url, {
+        signal: controller.signal,
+        headers: { 'x-api-key': key }
+      });
+      if (!r.ok) { console.warn('[TikHub] HTTP', r.status); continue; }
       const j = await r.json();
-      console.log('[TikHub proxy] code:', j?.code, 'data keys:', Object.keys(j?.data||{}));
-      if (j?.code && j.code !== 200 && j.code !== 0) {
-        if (j.code === 401) throw new Error('TikHub Key 无效（401）');
+      console.log('[TikHub proxy] endpoint:', req.type, 'success:', j?.success, 'items:', j?.items?.length);
+
+      if (!j?.success) {
+        if (j?.error?.includes('401') || j?.error?.includes('无效')) throw new Error('TikHub Key 无效（401）');
         continue;
       }
-      const list = j?.data?.data || j?.data?.aweme_list || j?.data?.video_list || (Array.isArray(j?.data)?j.data:null);
-      if (list?.length > 0) { console.log('[TikHub] ✅', list.length, 'videos'); return list; }
+
+      // 搜索结果：直接返回视频列表格式
+      if (req.type === 'search' && j.items?.length > 0) {
+        return j.items.map(item => ({
+          aweme_id: item.awemeId || '',
+          desc: item.desc || '',
+          author: { nickname: item.author || '', uid: item.authorId || '' },
+          statistics: {
+            digg_count: item.diggCount || 0,
+            comment_count: item.commentCount || 0,
+            share_count: item.shareCount || 0,
+            play_count: item.playCount || 0,
+          },
+          video: { cover: { url_list: item.coverUrl ? [item.coverUrl] : [] } },
+          search_keyword: keyword,
+        }));
+      }
+
+      // 热搜结果：转换为可识别的格式
+      if (req.type === 'hot_search' && j.items?.length > 0) {
+        return j.items.slice(0, 20).map(item => ({
+          _isHotSearch: true,
+          desc: item.word || '',
+          _hotValue: item.hotValue || 0,
+        }));
+      }
     } catch(e) {
-      if (e.name==='AbortError') continue;
+      if (e.name === 'AbortError') { console.warn('[TikHub] timeout'); continue; }
       if (e.message.includes('无效')) throw e;
       console.warn('[TikHub]', e.message);
     }
@@ -1874,13 +1903,18 @@ async function testAndSaveDataSource() {
       sampleText = d.content?.[0]?.text || 'OK';
       testOk = true;
     } else {
-      // 测试 TikHub Key
-      const awemes = await Promise.race([
-        fetchViaTikHub('美食'),
-        new Promise((_,rej) => setTimeout(() => rej(new Error('TIMEOUT')), 20000))
-      ]);
-      if (!awemes?.length) throw new Error('TikHub 返回数据为空，请检查 Key 和账户余额');
-      sampleText = `获取 ${awemes.length} 条视频`;
+      // 测试 TikHub Key：调用热搜榜接口
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(), 20000);
+      const r = await fetch('/api/tikhub?endpoint=hot_search', {
+        signal: controller.signal,
+        headers: { 'x-api-key': key }
+      });
+      const j = await r.json();
+      if (!j?.success) throw new Error(j?.error || 'TikHub 返回异常，请检查 Key 和账户余额');
+      const count = j?.items?.length || 0;
+      if (count === 0) throw new Error('TikHub 返回数据为空，请检查 Key 和账户余额');
+      sampleText = `获取到 ${count} 条热搜数据`;
       testOk = true;
     }
 

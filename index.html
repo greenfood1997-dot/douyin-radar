@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>抖音爆款雷达 v4.0 · 真实数据版</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root {
   --bg: #0c0e14;
@@ -522,9 +523,108 @@ header {
   header{padding:0 16px;}
   .track-grid-full{grid-template-columns:repeat(auto-fill,minmax(130px,1fr));}
 }
+
+/* ====== AUTH OVERLAY ====== */
+#authOverlay {
+  position:fixed;inset:0;z-index:9999;
+  background:#0c0e14;
+  display:flex;align-items:center;justify-content:center;
+}
+#authOverlay::before {
+  content:'';position:fixed;inset:0;
+  background:
+    radial-gradient(ellipse 800px 600px at 0% 0%, rgba(255,51,85,0.1) 0%,transparent 60%),
+    radial-gradient(ellipse 600px 500px at 100% 100%, rgba(0,212,255,0.08) 0%,transparent 60%);
+  pointer-events:none;
+}
+.auth-box {
+  position:relative;z-index:1;width:100%;max-width:420px;
+  background:rgba(19,21,31,0.97);border:1px solid #2a2d3e;
+  border-radius:20px;padding:40px 36px;
+  box-shadow:0 24px 80px rgba(0,0,0,0.6);margin:20px;
+}
+.auth-logo{text-align:center;margin-bottom:28px;}
+.auth-logo-icon{width:52px;height:52px;background:linear-gradient(135deg,#ff3355,#7c3aed);border-radius:14px;display:inline-flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:12px;}
+.auth-logo-title{font-size:20px;font-weight:800;color:#f0f2f8;}
+.auth-logo-sub{font-size:11px;color:#6b7280;margin-top:4px;}
+.auth-tabs{display:flex;background:#13151f;border:1px solid #2a2d3e;border-radius:10px;padding:4px;margin-bottom:24px;gap:4px;}
+.auth-tab{flex:1;padding:9px;border:none;background:transparent;color:#6b7280;font-size:13px;font-weight:600;cursor:pointer;border-radius:7px;transition:all 0.2s;font-family:'Noto Sans SC',sans-serif;}
+.auth-tab.active{background:linear-gradient(135deg,#ff3355,#c42d48);color:#fff;}
+.auth-method-tabs{display:flex;gap:8px;margin-bottom:20px;}
+.auth-method-tab{flex:1;padding:8px;border:1px solid #2a2d3e;background:transparent;color:#6b7280;font-size:11px;font-weight:600;cursor:pointer;border-radius:8px;transition:all 0.2s;font-family:'Noto Sans SC',sans-serif;text-align:center;}
+.auth-method-tab.active{border-color:#ff3355;color:#ff3355;background:rgba(255,51,85,0.08);}
+.auth-field{margin-bottom:14px;}
+.auth-field label{display:block;font-size:11px;font-weight:700;color:#9ca3af;margin-bottom:6px;}
+.auth-field input{width:100%;padding:11px 14px;background:#1a1d2a;border:1px solid #2a2d3e;border-radius:9px;color:#e8eaf0;font-size:13px;outline:none;transition:border-color 0.2s;font-family:'Noto Sans SC',sans-serif;}
+.auth-field input:focus{border-color:#ff3355;}
+.auth-field input::placeholder{color:#4b5563;}
+.auth-sms-row{display:flex;gap:8px;}
+.auth-sms-row input{flex:1;}
+.auth-send-code{padding:11px 14px;background:#1a1d2a;border:1px solid #2a2d3e;border-radius:9px;color:#00d4ff;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;transition:all 0.2s;font-family:'Noto Sans SC',sans-serif;}
+.auth-send-code:hover{border-color:#00d4ff;background:rgba(0,212,255,0.08);}
+.auth-send-code:disabled{color:#4b5563;border-color:#2a2d3e;cursor:not-allowed;}
+.auth-btn{width:100%;padding:13px;margin-top:8px;background:linear-gradient(135deg,#ff3355,#c42d48);border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:800;cursor:pointer;transition:opacity 0.2s;font-family:'Noto Sans SC',sans-serif;}
+.auth-btn:hover{opacity:0.88;}
+.auth-btn:disabled{opacity:0.5;cursor:not-allowed;}
+.auth-error{background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#f87171;font-size:11px;padding:9px 12px;border-radius:8px;margin-bottom:12px;display:none;}
+.auth-success{background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);color:#34d399;font-size:11px;padding:9px 12px;border-radius:8px;margin-bottom:12px;display:none;}
+.auth-footer{text-align:center;margin-top:20px;font-size:11px;color:#4b5563;}
+.auth-footer a{color:#ff3355;cursor:pointer;}
 </style>
 </head>
 <body>
+
+<!-- ====== AUTH OVERLAY ====== -->
+<div id="authOverlay">
+  <div class="auth-box">
+    <div class="auth-logo">
+      <div class="auth-logo-icon">🎯</div>
+      <div class="auth-logo-title">DOUYIN RADAR</div>
+      <div class="auth-logo-sub">抖音爆款雷达 · 登录后开始使用</div>
+    </div>
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="tabLogin" onclick="switchAuthMode('login')">登录</button>
+      <button class="auth-tab" id="tabRegister" onclick="switchAuthMode('register')">注册</button>
+    </div>
+    <div class="auth-method-tabs">
+      <button class="auth-method-tab active" id="methodEmail" onclick="switchMethod('email')">📧 邮箱</button>
+      <button class="auth-method-tab" id="methodPhone" onclick="switchMethod('phone')">📱 手机号</button>
+    </div>
+    <div id="authError" class="auth-error"></div>
+    <div id="authSuccess" class="auth-success"></div>
+    <div id="emailForm">
+      <div class="auth-field" id="usernameField" style="display:none;">
+        <label>昵称（选填）</label>
+        <input type="text" id="inputUsername" placeholder="你的昵称" />
+      </div>
+      <div class="auth-field">
+        <label>邮箱</label>
+        <input type="email" id="inputEmail" placeholder="your@email.com" />
+      </div>
+      <div class="auth-field">
+        <label>密码</label>
+        <input type="password" id="inputPassword" placeholder="至少6位密码" />
+      </div>
+      <button class="auth-btn" id="emailSubmitBtn" onclick="handleEmailAuth()">登录</button>
+    </div>
+    <div id="phoneForm" style="display:none;">
+      <div class="auth-field">
+        <label>手机号</label>
+        <div class="auth-sms-row">
+          <input type="tel" id="inputPhone" placeholder="+86 13800138000" />
+          <button class="auth-send-code" id="sendCodeBtn" onclick="sendSmsCode()">发送验证码</button>
+        </div>
+      </div>
+      <div class="auth-field" id="codeField" style="display:none;">
+        <label>验证码</label>
+        <input type="text" id="inputCode" placeholder="6位验证码" maxlength="6" />
+      </div>
+      <button class="auth-btn" id="phoneSubmitBtn" onclick="handlePhoneAuth()" style="display:none;">验证并登录</button>
+    </div>
+    <div class="auth-footer">登录即同意 <a>用户协议</a> 和 <a>隐私政策</a></div>
+  </div>
+</div>
+
 
 <!-- HEADER -->
 <header>
@@ -3051,6 +3151,153 @@ renderTrackGrid();
     </div>
   </div>
 </div>
+
+
+<script>
+// ====== SUPABASE AUTH ======
+const SUPABASE_URL = 'https://tmgeooxadslsmijonzzj.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtZ2Vvb3hhZHNsc21pam9uenpqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5MjU5MzAsImV4cCI6MjA4NzUwMTkzMH0.grXfw6ttC7NuhTPvn9vNYBc0Sbo5CzQf830bzRdPJtA';
+const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let _authMode = 'login'; // login | register
+let _authMethod = 'email'; // email | phone
+let _smsCountdown = 0;
+
+async function initAuth() {
+  const { data: { session } } = await _supabase.auth.getSession();
+  if (session) {
+    hideAuthOverlay();
+  }
+  _supabase.auth.onAuthStateChange((event, session) => {
+    if (session) hideAuthOverlay();
+  });
+}
+
+function hideAuthOverlay() {
+  const overlay = document.getElementById('authOverlay');
+  if (overlay) {
+    overlay.style.opacity = '0';
+    overlay.style.transition = 'opacity 0.4s';
+    setTimeout(() => overlay.style.display = 'none', 400);
+  }
+}
+
+function switchAuthMode(mode) {
+  _authMode = mode;
+  document.getElementById('tabLogin').className = 'auth-tab' + (mode === 'login' ? ' active' : '');
+  document.getElementById('tabRegister').className = 'auth-tab' + (mode === 'register' ? ' active' : '');
+  document.getElementById('usernameField').style.display = mode === 'register' ? 'block' : 'none';
+  document.getElementById('emailSubmitBtn').textContent = mode === 'login' ? '登录' : '注册';
+  clearAuthMsg();
+}
+
+function switchMethod(method) {
+  _authMethod = method;
+  document.getElementById('methodEmail').className = 'auth-method-tab' + (method === 'email' ? ' active' : '');
+  document.getElementById('methodPhone').className = 'auth-method-tab' + (method === 'phone' ? ' active' : '');
+  document.getElementById('emailForm').style.display = method === 'email' ? 'block' : 'none';
+  document.getElementById('phoneForm').style.display = method === 'phone' ? 'block' : 'none';
+  clearAuthMsg();
+}
+
+function showAuthError(msg) {
+  const el = document.getElementById('authError');
+  el.textContent = msg; el.style.display = 'block';
+  document.getElementById('authSuccess').style.display = 'none';
+}
+function showAuthSuccess(msg) {
+  const el = document.getElementById('authSuccess');
+  el.textContent = msg; el.style.display = 'block';
+  document.getElementById('authError').style.display = 'none';
+}
+function clearAuthMsg() {
+  document.getElementById('authError').style.display = 'none';
+  document.getElementById('authSuccess').style.display = 'none';
+}
+
+async function handleEmailAuth() {
+  const email = document.getElementById('inputEmail').value.trim();
+  const password = document.getElementById('inputPassword').value;
+  const username = document.getElementById('inputUsername').value.trim();
+  const btn = document.getElementById('emailSubmitBtn');
+  if (!email || !password) return showAuthError('请填写邮箱和密码');
+  if (password.length < 6) return showAuthError('密码至少6位');
+  btn.disabled = true;
+  btn.textContent = '请稍候...';
+  clearAuthMsg();
+  try {
+    if (_authMode === 'login') {
+      const { error } = await _supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+    } else {
+      const { error } = await _supabase.auth.signUp({
+        email, password,
+        options: { data: { username: username || email.split('@')[0] } }
+      });
+      if (error) throw error;
+      showAuthSuccess('注册成功！请查收验证邮件，点击确认后登录。');
+      btn.disabled = false;
+      btn.textContent = '注册';
+      return;
+    }
+  } catch(e) {
+    let msg = e.message || '操作失败';
+    if (msg.includes('Invalid login')) msg = '邮箱或密码错误';
+    if (msg.includes('already registered')) msg = '该邮箱已注册，请直接登录';
+    if (msg.includes('Email not confirmed')) msg = '请先验证邮箱后再登录';
+    showAuthError(msg);
+  }
+  btn.disabled = false;
+  btn.textContent = _authMode === 'login' ? '登录' : '注册';
+}
+
+async function sendSmsCode() {
+  const phone = document.getElementById('inputPhone').value.trim();
+  if (!phone) return showAuthError('请输入手机号');
+  const btn = document.getElementById('sendCodeBtn');
+  btn.disabled = true;
+  clearAuthMsg();
+  try {
+    const { error } = await _supabase.auth.signInWithOtp({ phone });
+    if (error) throw error;
+    document.getElementById('codeField').style.display = 'block';
+    document.getElementById('phoneSubmitBtn').style.display = 'block';
+    showAuthSuccess('验证码已发送！');
+    let count = 60;
+    _smsCountdown = setInterval(() => {
+      btn.textContent = count + 's后重发';
+      count--;
+      if (count < 0) { clearInterval(_smsCountdown); btn.disabled = false; btn.textContent = '发送验证码'; }
+    }, 1000);
+  } catch(e) {
+    let msg = e.message || '发送失败';
+    if (msg.includes('SMS')) msg = '短信发送失败，请检查手机号格式（需+86开头）';
+    showAuthError(msg);
+    btn.disabled = false;
+  }
+}
+
+async function handlePhoneAuth() {
+  const phone = document.getElementById('inputPhone').value.trim();
+  const token = document.getElementById('inputCode').value.trim();
+  const btn = document.getElementById('phoneSubmitBtn');
+  if (!phone || !token) return showAuthError('请输入手机号和验证码');
+  btn.disabled = true; btn.textContent = '验证中...';
+  clearAuthMsg();
+  try {
+    const { error } = await _supabase.auth.verifyOtp({ phone, token, type: 'sms' });
+    if (error) throw error;
+  } catch(e) {
+    let msg = e.message || '验证失败';
+    if (msg.includes('Token has expired')) msg = '验证码已过期，请重新发送';
+    if (msg.includes('Invalid')) msg = '验证码错误，请重新输入';
+    showAuthError(msg);
+  }
+  btn.disabled = false; btn.textContent = '验证并登录';
+}
+
+initAuth();
+</script>
 
 </body>
 </html>

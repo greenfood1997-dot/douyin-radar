@@ -90,8 +90,8 @@ header {
 @keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(16,185,129,0.4);}50%{opacity:0.6;box-shadow:0 0 0 4px rgba(16,185,129,0);}}
 
 /* ====== MAIN TABS ====== */
-#view-monitor,#view-track,#view-analyze,#view-report{display:none;}
-#view-monitor.active,#view-track.active,#view-analyze.active,#view-report.active{display:block;}
+#view-monitor,#view-track,#view-analyze,#view-report,#view-account{display:none;}
+#view-monitor.active,#view-track.active,#view-analyze.active,#view-report.active,#view-account.active{display:block;}
 
 /* ====== LAYOUT ====== */
 .page{
@@ -539,7 +539,7 @@ header {
     <div class="nav-tab active" onclick="switchView('monitor',this)">📡 实时监测</div>
     <div class="nav-tab" onclick="switchView('track',this)">🏁 赛道选取</div>
     <div class="nav-tab" onclick="switchView('analyze',this)">💥 爆款拆解</div>
-    <div class="nav-tab" onclick="switchView('report',this)">📋 分析报告</div>
+    <div class="nav-tab" onclick="switchView('account',this)">👤 账号监测</div>
   </div>
   <div class="header-right">
     <div class="status-pill">
@@ -948,7 +948,515 @@ header {
 </div>
 </div>
 
+<!-- ========== VIEW: ACCOUNT 账号监测 ========== -->
+<div id="view-account">
+<div class="page">
+
+  <div class="section-hd" style="margin-bottom:20px;">
+    <div>
+      <div class="section-title">👤 账号监测中心</div>
+      <div class="section-sub">添加抖音账号，设定爆款阈值，实时检测爆款内容并弹窗提醒</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <div id="accMonBadge" style="font-size:10px;padding:4px 12px;border-radius:20px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);color:#10b981;font-family:'IBM Plex Mono',monospace;">
+        ● 0 账号监测中
+      </div>
+      <button class="btn btn-red" onclick="openAddAccountModal()">+ 添加账号</button>
+    </div>
+  </div>
+
+  <!-- 全局爆款阈值设置 -->
+  <div class="card" style="margin-bottom:16px;">
+    <div class="card-hd">
+      <div class="card-title">⚙️ 全局监测设置</div>
+    </div>
+    <div class="card-body" style="display:flex;gap:24px;align-items:center;flex-wrap:wrap;">
+      <div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">默认爆款指数阈值</div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <input type="range" id="globalThreshold" min="50" max="99" value="80"
+            style="width:160px;accent-color:var(--accent);" oninput="updateGlobalThresholdLabel(this.value)">
+          <span id="globalThresholdLabel" style="font-family:'IBM Plex Mono',monospace;font-size:16px;color:var(--accent);font-weight:700;min-width:36px;">80</span>
+        </div>
+        <div style="font-size:10px;color:var(--muted);margin-top:3px;">超过此数值时触发爆款弹窗提醒</div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">检测间隔</div>
+        <select id="accIntervalSelect" class="interval-select">
+          <option value="60">每1分钟</option>
+          <option value="300" selected>每5分钟</option>
+          <option value="600">每10分钟</option>
+          <option value="1800">每30分钟</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-red" onclick="startAccMonitor()">▶ 启动所有账号监测</button>
+        <button class="btn btn-ghost" onclick="stopAccMonitor()">⏸ 停止</button>
+      </div>
+      <div style="margin-left:auto;">
+        <div style="font-size:10px;color:var(--muted);font-family:'IBM Plex Mono',monospace;" id="accCountdown">未启动</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 账号列表 -->
+  <div class="section-label">已添加账号</div>
+  <div id="accountList">
+    <div class="empty" style="padding:60px 0;text-align:center;">
+      <div style="font-size:40px;margin-bottom:12px;">👤</div>
+      <div style="font-size:14px;color:var(--muted);">还没有添加任何账号<br>点击右上角「+ 添加账号」开始监测</div>
+    </div>
+  </div>
+
+  <!-- 爆款动态记录 -->
+  <div class="section-label" style="margin-top:20px;">📢 爆款动态记录</div>
+  <div class="card">
+    <div class="card-hd">
+      <div class="card-title">最近检测到的爆款内容</div>
+      <button class="btn btn-ghost btn-sm" onclick="clearAccAlerts()">清空记录</button>
+    </div>
+    <div class="card-body" id="accAlertLog" style="max-height:340px;overflow-y:auto;padding:0;">
+      <div class="empty" style="padding:32px;"><div class="empty-icon">🔔</div><div class="empty-text">启动监测后，爆款内容将在此记录</div></div>
+    </div>
+  </div>
+
+</div>
+</div>
+
 <script>
+// ============ 账号监测模块 ============
+let accountList = JSON.parse(localStorage.getItem('acc_list') || '[]');
+let accMonitorInterval = null;
+let accCountdownTimer = null;
+let accMonitorRunning = false;
+let accCountdown = 300;
+let accAlerts = [];
+
+function saveAccountList() {
+  localStorage.setItem('acc_list', JSON.stringify(accountList));
+}
+
+function openAddAccountModal() {
+  document.getElementById('addAccModal').style.display = 'flex';
+  document.getElementById('accUrlInput').value = '';
+  document.getElementById('accNickInput').value = '';
+  document.getElementById('accThreshInput').value = parseInt(document.getElementById('globalThreshold').value) || 80;
+  document.getElementById('addAccError').style.display = 'none';
+}
+
+function closeAddAccountModal() {
+  document.getElementById('addAccModal').style.display = 'none';
+}
+
+function addAccount() {
+  const url = document.getElementById('accUrlInput').value.trim();
+  const nick = document.getElementById('accNickInput').value.trim();
+  const thresh = parseInt(document.getElementById('accThreshInput').value) || 80;
+  const errEl = document.getElementById('addAccError');
+
+  if (!url && !nick) {
+    errEl.style.display = 'block';
+    errEl.textContent = '请至少填写账号链接或昵称！';
+    return;
+  }
+
+  // 解析账号ID
+  let accountId = '';
+  let displayUrl = url;
+  if (url.includes('douyin.com/user/')) {
+    accountId = url.split('douyin.com/user/')[1].split('?')[0].split('/')[0];
+  } else if (url.includes('@')) {
+    accountId = url.split('@')[1].split('?')[0];
+  } else if (url) {
+    accountId = url;
+  } else {
+    accountId = 'custom_' + Date.now();
+    displayUrl = '';
+  }
+
+  if (accountList.find(a => a.id === accountId)) {
+    errEl.style.display = 'block';
+    errEl.textContent = '该账号已添加过了';
+    return;
+  }
+
+  const account = {
+    id: accountId,
+    nick: nick || accountId,
+    url: displayUrl,
+    threshold: thresh,
+    enabled: true,
+    addedAt: new Date().toLocaleString('zh-CN'),
+    lastCheck: null,
+    latestVideos: [],
+    viralCount: 0,
+    avatar: ['🎬','📱','🌟','🎭','💫','🔥','⚡','🎯'][Math.floor(Math.random()*8)],
+  };
+
+  accountList.push(account);
+  saveAccountList();
+  renderAccountList();
+  closeAddAccountModal();
+  showToast(`✅ 已添加「${account.nick}」，启动监测后开始检测`);
+}
+
+function removeAccount(id) {
+  accountList = accountList.filter(a => a.id !== id);
+  saveAccountList();
+  renderAccountList();
+  updateAccBadge();
+  showToast('账号已移除');
+}
+
+function toggleAccount(id) {
+  const acc = accountList.find(a => a.id === id);
+  if (!acc) return;
+  acc.enabled = !acc.enabled;
+  saveAccountList();
+  renderAccountList();
+  updateAccBadge();
+}
+
+function updateAccountThreshold(id, val) {
+  const acc = accountList.find(a => a.id === id);
+  if (!acc) return;
+  acc.threshold = parseInt(val);
+  saveAccountList();
+  document.getElementById('thresh-label-' + id).textContent = val;
+}
+
+function updateGlobalThresholdLabel(val) {
+  document.getElementById('globalThresholdLabel').textContent = val;
+}
+
+function renderAccountList() {
+  const container = document.getElementById('accountList');
+  if (!container) return;
+  if (accountList.length === 0) {
+    container.innerHTML = `<div class="empty" style="padding:60px 0;text-align:center;">
+      <div style="font-size:40px;margin-bottom:12px;">👤</div>
+      <div style="font-size:14px;color:var(--muted);">还没有添加任何账号<br>点击右上角「+ 添加账号」开始监测</div>
+    </div>`;
+    return;
+  }
+  container.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;margin-bottom:4px;">` +
+    accountList.map(acc => `
+    <div style="background:var(--surface);border:1px solid ${acc.enabled ? 'var(--border)' : '#1e2030'};border-radius:14px;overflow:hidden;opacity:${acc.enabled?1:0.55};transition:all 0.2s;${acc.enabled?'border-top:2px solid var(--accent);':''}">
+      <div style="padding:16px 18px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border);">
+        <div style="width:42px;height:42px;border-radius:50%;background:rgba(255,51,85,0.1);border:1px solid rgba(255,51,85,0.25);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">${acc.avatar}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:13px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${acc.nick}</div>
+          <div style="font-size:10px;color:var(--muted);font-family:'IBM Plex Mono',monospace;margin-top:2px;">${acc.url ? acc.url.slice(0,36)+'…' : '手动输入'}</div>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <button onclick="toggleAccount('${acc.id}')" style="padding:4px 10px;border-radius:5px;border:1px solid var(--border);background:${acc.enabled?'rgba(16,185,129,0.1)':'var(--surface2)'};color:${acc.enabled?'#10b981':'var(--muted)'};font-size:10px;cursor:pointer;">${acc.enabled?'● 监测中':'○ 已停'}</button>
+          <button onclick="removeAccount('${acc.id}')" style="padding:4px 8px;border-radius:5px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-size:10px;cursor:pointer;">✕</button>
+        </div>
+      </div>
+      <div style="padding:14px 18px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <div style="font-size:11px;color:var(--muted);">爆款指数阈值</div>
+          <span id="thresh-label-${acc.id}" style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:var(--accent);font-weight:700;">${acc.threshold}</span>
+        </div>
+        <input type="range" min="50" max="99" value="${acc.threshold}"
+          style="width:100%;accent-color:var(--accent);margin-bottom:10px;"
+          oninput="updateAccountThreshold('${acc.id}', this.value)">
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:10px;color:var(--muted);font-family:'IBM Plex Mono',monospace;">
+          <span>上次检测：${acc.lastCheck || '未检测'}</span>
+          <span style="color:var(--accent);">发现爆款：${acc.viralCount} 次</span>
+        </div>
+        <div style="margin-top:6px;display:flex;justify-content:space-between;align-items:center;">
+          ${acc._dataSource === 'real'   ? '<span style="font-size:9px;background:rgba(16,185,129,0.1);color:#10b981;border:1px solid rgba(16,185,129,0.25);border-radius:3px;padding:1px 7px;font-family:\'IBM Plex Mono\',monospace;">● 真实数据</span>' :
+            acc._dataSource === 'search' ? '<span style="font-size:9px;background:rgba(0,212,255,0.1);color:var(--accent2);border:1px solid rgba(0,212,255,0.25);border-radius:3px;padding:1px 7px;font-family:\'IBM Plex Mono\',monospace;">◎ 搜索数据</span>' :
+            '<span style="font-size:9px;background:rgba(107,114,128,0.1);color:var(--muted);border:1px solid var(--border);border-radius:3px;padding:1px 7px;font-family:\'IBM Plex Mono\',monospace;">○ 演示模式</span>'}
+          ${acc._hint ? `<span style="font-size:9px;color:var(--gold);cursor:pointer;" title="${acc._hint}">⚠ 提示</span>` : ''}
+        </div>
+        ${acc.lastVideo ? `<div style="margin-top:8px;background:var(--surface2);border-radius:6px;padding:8px 10px;font-size:11px;color:var(--text);border-left:2px solid var(--accent);">最新：${acc.lastVideo}</div>` : ''}
+      </div>
+    </div>`).join('') + `</div>`;
+}
+
+function updateAccBadge() {
+  const enabled = accountList.filter(a => a.enabled).length;
+  const badge = document.getElementById('accMonBadge');
+  if (badge) badge.textContent = `● ${enabled} 账号监测中`;
+}
+
+// 账号监测核心：模拟/真实数据检测
+// ── 调用 /api/tikhub?endpoint=user_posts 获取账号真实视频 ──────
+async function fetchUserPosts(acc, tikhubKey) {
+  const params = new URLSearchParams({ endpoint: 'user_posts', count: '20' });
+
+  // 优先用 sec_uid（从主页链接解析）
+  if (acc.sec_uid) {
+    params.set('sec_uid', acc.sec_uid);
+  } else if (acc.url && acc.url.includes('MS4')) {
+    // 从链接里提取 sec_uid（MS4wLjAB... 格式）
+    const m = acc.url.match(/user\/(MS4[^/?#]+)/);
+    if (m) { acc.sec_uid = m[1]; params.set('sec_uid', m[1]); }
+  }
+  // 备用：unique_id / 昵称
+  if (!params.has('sec_uid') && acc.id && !acc.id.startsWith('custom_')) {
+    params.set('unique_id', acc.id);
+  }
+
+  const ctrl = new AbortController();
+  setTimeout(() => ctrl.abort(), 18000);
+  const r = await fetch('/api/tikhub?' + params.toString(), {
+    signal: ctrl.signal,
+    headers: { 'x-api-key': tikhubKey }
+  });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const j = await r.json();
+  if (!j?.success) throw new Error(j?.error || 'user_posts 接口返回失败');
+  return j; // { items: [...], total, _source, _debug, _hint }
+}
+
+async function checkAccountsOnce() {
+  const enabled = accountList.filter(a => a.enabled);
+  if (enabled.length === 0) return;
+
+  const tikhubKey = localStorage.getItem('tikhub_key') || localStorage.getItem('ds_key') || _dsKey;
+  const hasKey = !!(tikhubKey && tikhubKey.length > 10);
+
+  for (const acc of enabled) {
+    acc.lastCheck = new Date().toLocaleTimeString('zh-CN');
+    let detectedVideos = [];
+    acc._dataSource = 'demo'; // 标记数据来源
+
+    // ── 路线A：TikHub user_posts 接口（真实账号视频）──────────
+    if (hasKey) {
+      try {
+        const result = await fetchUserPosts(acc, tikhubKey);
+        if (result.items && result.items.length > 0) {
+          detectedVideos = result.items.map(item => ({
+            aweme_id: item.aweme_id || '',
+            title:    item.desc || item.fullDesc || '',
+            heat:     item.heatScore || 75,
+            likes:    item.diggStr || '0',
+            comments: item.commentStr || '0',
+            shares:   item.shareStr || '0',
+            plays:    item.playStr || '0',
+            track:    acc.nick,
+            emoji:    acc.avatar,
+            isNew:    true,
+            trend:    '+',
+            trendVal: Math.max(1, (item.heatScore || 75) - 70),
+            source:   'real',
+          }));
+          acc._dataSource = 'real';
+        } else if (result._hint) {
+          // 接口通了但无视频，记录提示
+          acc._hint = result._hint;
+        }
+      } catch(e) {
+        console.warn('[accCheck] user_posts failed:', e.message);
+        // user_posts 失败，降级到关键词搜索
+        try {
+          const items = await fetchViaTikHub(acc.nick);
+          if (items && items.length > 0) {
+            detectedVideos = items.map(item => normalizeAweme(item, acc.nick)).filter(Boolean);
+            acc._dataSource = 'search';
+          }
+        } catch(e2) {
+          console.warn('[accCheck] search fallback failed:', e2.message);
+        }
+      }
+    }
+
+    // ── 路线B：无 Key 或全部失败，生成演示数据 ──────────────
+    if (detectedVideos.length === 0) {
+      const demoTitles = [
+        ['这个方法让我粉丝涨了10万','没想到这么简单','当年的那件事，今天第一次说','测评了100款产品，这个真绝了','凌晨3点，想通了一件事'],
+        ['不敢相信这是真的','全网都在学这个','花了3个月总结的干货','这条视频我删了7次，今天发出来'],
+      ];
+      detectedVideos = demoTitles[0].map((t, i) => ({
+        aweme_id: '', title: `「${acc.nick}」${t}`,
+        heat: Math.floor(60 + Math.random() * 38),
+        likes: (Math.random()*100+5).toFixed(1)+'万',
+        comments: (Math.random()*3+0.2).toFixed(1)+'万',
+        shares: (Math.random()*5+0.5).toFixed(1)+'万',
+        plays: (Math.random()*500+50).toFixed(0)+'万',
+        track: acc.nick, emoji: acc.avatar,
+        isNew: i === 0, trend: '+', trendVal: Math.floor(Math.random()*15+3),
+        source: 'demo',
+      }));
+      acc._dataSource = 'demo';
+    }
+
+    // ── 检测爆款，触发弹窗 ──────────────────────────────────
+    const viralVideos = detectedVideos.filter(v => v.heat >= acc.threshold);
+    if (viralVideos.length > 0) {
+      acc.viralCount += viralVideos.length;
+      acc.lastVideo = viralVideos[0].title.slice(0, 40) + '…';
+      viralVideos.forEach(v => triggerViralAlert(acc, v));
+    }
+  }
+
+  saveAccountList();
+  renderAccountList();
+  updateAccBadge();
+  renderAccAlertLog();
+}
+
+function triggerViralAlert(acc, video) {
+  // 记录到日志
+  accAlerts.unshift({
+    account: acc.nick,
+    avatar: acc.avatar,
+    title: video.title,
+    heat: video.heat,
+    likes: video.likes,
+    time: new Date().toLocaleString('zh-CN'),
+  });
+  if (accAlerts.length > 50) accAlerts.pop();
+
+  // 显示大弹窗
+  showViralPopup(acc, video);
+}
+
+function showViralPopup(acc, video) {
+  const existing = document.getElementById('viralPopup');
+  if (existing) existing.remove();
+
+  const popup = document.createElement('div');
+  popup.id = 'viralPopup';
+  popup.style.cssText = `
+    position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:99999;
+    display:flex;align-items:center;justify-content:center;
+    backdrop-filter:blur(12px);animation:fadeIn 0.3s ease;
+  `;
+  popup.innerHTML = `
+    <div style="background:#13151f;border:1px solid rgba(255,51,85,0.5);border-radius:20px;
+      padding:32px;width:92%;max-width:460px;box-shadow:0 0 60px rgba(255,51,85,0.3);
+      animation:slideIn 0.4s ease;position:relative;">
+      <!-- 顶部光晕 -->
+      <div style="position:absolute;top:0;left:50%;transform:translateX(-50%);width:200px;height:2px;
+        background:linear-gradient(90deg,transparent,var(--accent),transparent);border-radius:2px;"></div>
+
+      <div style="text-align:center;margin-bottom:20px;">
+        <div style="font-size:48px;margin-bottom:8px;animation:pulse 1s infinite;">${acc.avatar}</div>
+        <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,51,85,0.1);
+          border:1px solid rgba(255,51,85,0.3);border-radius:20px;padding:4px 14px;margin-bottom:12px;">
+          <div style="width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse 1s infinite;"></div>
+          <span style="font-size:11px;color:var(--accent);font-family:'IBM Plex Mono',monospace;font-weight:700;">爆款预警</span>
+        </div>
+        <div style="font-size:18px;font-weight:900;color:var(--text);margin-bottom:4px;">「${acc.nick}」出爆款了！</div>
+        <div style="font-size:12px;color:var(--muted);">爆款指数已超过你设定的 ${acc.threshold} 阈值</div>
+      </div>
+
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:20px;">
+        <div style="font-size:13px;font-weight:600;color:var(--text);line-height:1.6;margin-bottom:12px;">${video.title}</div>
+        <div style="display:flex;gap:12px;align-items:center;">
+          <div style="flex:1;">
+            <div style="font-size:10px;color:var(--muted);margin-bottom:4px;">爆款指数</div>
+            <div style="height:8px;background:var(--surface3);border-radius:8px;overflow:hidden;">
+              <div style="height:100%;width:${video.heat}%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:8px;transition:width 1s;"></div>
+            </div>
+          </div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:24px;font-weight:900;color:var(--accent);">${video.heat}</div>
+        </div>
+        <div style="margin-top:8px;display:flex;gap:16px;font-size:11px;color:var(--muted);">
+          <span>❤️ ${video.likes || '--'}</span>
+          <span style="font-family:'IBM Plex Mono',monospace;">${new Date().toLocaleTimeString('zh-CN')}</span>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;">
+        <button onclick="goToVideoFromAlert('${encodeURIComponent(video.title)}','${video.aweme_id||''}')"
+          style="flex:1;padding:12px;background:var(--accent);border:none;border-radius:10px;
+          color:white;font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans SC',sans-serif;">
+          🔥 立即查看视频
+        </button>
+        <button onclick="document.getElementById('viralPopup').remove()"
+          style="padding:12px 16px;background:var(--surface2);border:1px solid var(--border);
+          border-radius:10px;color:var(--muted);font-size:12px;cursor:pointer;font-family:'Noto Sans SC',sans-serif;">
+          知道了
+        </button>
+      </div>
+      <div style="text-align:center;margin-top:12px;font-size:10px;color:var(--muted);">5秒后自动关闭</div>
+    </div>
+  `;
+  document.body.appendChild(popup);
+
+  // 5秒自动关闭
+  setTimeout(() => { if (document.getElementById('viralPopup')) document.getElementById('viralPopup').remove(); }, 5000);
+}
+
+function goToVideoFromAlert(titleEnc, awemeId) {
+  document.getElementById('viralPopup')?.remove();
+  const title = decodeURIComponent(titleEnc);
+  if (awemeId && !awemeId.startsWith('builtin_') && !awemeId.startsWith('hot_')) {
+    window.open('https://www.douyin.com/video/' + awemeId, '_blank');
+  } else {
+    window.open('https://www.douyin.com/search/' + encodeURIComponent(title) + '?type=video&sort_type=1', '_blank');
+  }
+}
+
+function renderAccAlertLog() {
+  const container = document.getElementById('accAlertLog');
+  if (!container) return;
+  if (accAlerts.length === 0) {
+    container.innerHTML = `<div class="empty" style="padding:32px;"><div class="empty-icon">🔔</div><div class="empty-text">启动监测后，爆款内容将在此记录</div></div>`;
+    return;
+  }
+  container.innerHTML = accAlerts.map(a => `
+    <div style="display:flex;gap:12px;align-items:flex-start;padding:14px 20px;border-bottom:1px solid rgba(42,45,62,0.5);">
+      <div style="font-size:22px;flex-shrink:0;">${a.avatar}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:11px;color:var(--accent);font-weight:700;margin-bottom:3px;">🔥 ${a.account} · 爆款预警</div>
+        <div style="font-size:12px;color:var(--text);line-height:1.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${a.title}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:4px;font-family:'IBM Plex Mono',monospace;">${a.time}</div>
+      </div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:900;color:var(--accent);flex-shrink:0;">${a.heat}</div>
+    </div>
+  `).join('');
+}
+
+function clearAccAlerts() {
+  accAlerts = [];
+  renderAccAlertLog();
+}
+
+function startAccMonitor() {
+  if (accountList.filter(a=>a.enabled).length === 0) {
+    showToast('请先添加并启用至少一个账号');
+    return;
+  }
+  if (accMonitorRunning) return;
+  accMonitorRunning = true;
+  const interval = parseInt(document.getElementById('accIntervalSelect').value);
+  accCountdown = interval;
+  updateAccBadge();
+
+  // 立即检测一次
+  checkAccountsOnce();
+
+  // 倒计时
+  if (accCountdownTimer) clearInterval(accCountdownTimer);
+  accCountdownTimer = setInterval(() => {
+    accCountdown--;
+    const m = Math.floor(accCountdown/60);
+    const s = accCountdown % 60;
+    const el = document.getElementById('accCountdown');
+    if (el) el.textContent = `下次检测：${m>0?m+'m':''}${s}s`;
+    if (accCountdown <= 0) {
+      checkAccountsOnce();
+      accCountdown = interval;
+    }
+  }, 1000);
+
+  showToast('✅ 账号监测已启动！');
+}
+
+function stopAccMonitor() {
+  accMonitorRunning = false;
+  if (accCountdownTimer) clearInterval(accCountdownTimer);
+  const el = document.getElementById('accCountdown');
+  if (el) el.textContent = '已停止';
+  showToast('监测已停止');
+}
+
 // ============ STATE ============
 let selectedTracks = [];
 let monitorInterval = null;
@@ -1006,10 +1514,21 @@ const SOURCE_GUIDES = {
 
 // ============ NAVIGATION ============
 function switchView(name, el) {
-  ['monitor','track','analyze','report'].forEach(v => document.getElementById('view-'+v).classList.remove('active'));
-  document.getElementById('view-'+name).classList.add('active');
+  ['monitor','track','analyze','report','account'].forEach(v => {
+    const el2 = document.getElementById('view-'+v);
+    if (el2) el2.classList.remove('active');
+  });
+  const target = document.getElementById('view-'+name);
+  if (target) target.classList.add('active');
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
   if(el) el.classList.add('active');
+
+  // 切换到账号监测时初始化渲染
+  if (name === 'account') {
+    renderAccountList();
+    updateAccBadge();
+    renderAccAlertLog();
+  }
 }
 
 // ============ TRACK SELECTION ============
@@ -2466,6 +2985,70 @@ renderTrackGrid();
       </button>
     </div>
     <div style="font-size:10px;color:#9ca3af;margin-top:10px;text-align:center;">Key 仅存在你的浏览器本地，不上传任何服务器</div>
+  </div>
+</div>
+
+<!-- ═══ 添加账号弹窗 ═══ -->
+<div id="addAccModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9998;align-items:center;justify-content:center;backdrop-filter:blur(8px);">
+  <div style="background:#fff;border-radius:18px;padding:28px;width:92%;max-width:480px;box-shadow:0 24px 60px rgba(0,0,0,0.3);max-height:90vh;overflow-y:auto;">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;">
+      <div>
+        <div style="font-size:16px;font-weight:800;color:#111827;">👤 添加监测账号</div>
+        <div style="font-size:11px;color:#9ca3af;margin-top:3px;">填写账号信息，设定爆款指数阈值</div>
+      </div>
+      <button onclick="closeAddAccountModal()" style="background:none;border:none;color:#9ca3af;cursor:pointer;font-size:22px;">✕</button>
+    </div>
+
+    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:11px;color:#1e40af;line-height:1.8;">
+      <strong>💡 支持以下格式：</strong><br>
+      ① 主页链接：<code style="background:#dbeafe;padding:1px 4px;border-radius:3px;">https://www.douyin.com/user/MS4wLjABAAAA...</code><br>
+      ② @账号：<code style="background:#dbeafe;padding:1px 4px;border-radius:3px;">@账号昵称</code><br>
+      ③ 直接填昵称（用于演示模式）
+    </div>
+
+    <div style="margin-bottom:14px;">
+      <div style="font-size:11px;color:#374151;font-weight:700;margin-bottom:6px;">账号主页链接（可选）</div>
+      <input id="accUrlInput" type="text" placeholder="https://www.douyin.com/user/..."
+        style="width:100%;background:#f9fafb;border:1.5px solid #e5e7eb;border-radius:8px;padding:11px 14px;font-size:12px;color:#111827;outline:none;box-sizing:border-box;font-family:monospace;"
+        onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#e5e7eb'"/>
+    </div>
+
+    <div style="margin-bottom:14px;">
+      <div style="font-size:11px;color:#374151;font-weight:700;margin-bottom:6px;">账号昵称（显示名称）</div>
+      <input id="accNickInput" type="text" placeholder="例如：李子柒、papi酱、疯狂小杨哥..."
+        style="width:100%;background:#f9fafb;border:1.5px solid #e5e7eb;border-radius:8px;padding:11px 14px;font-size:13px;color:#111827;outline:none;box-sizing:border-box;font-family:'Noto Sans SC',sans-serif;"
+        onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#e5e7eb'"/>
+    </div>
+
+    <div style="margin-bottom:18px;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+        <div style="font-size:11px;color:#374151;font-weight:700;">爆款指数阈值</div>
+        <span id="accThreshPreview" style="font-size:15px;font-weight:800;color:#ef4444;font-family:monospace;">80</span>
+      </div>
+      <input type="range" id="accThreshInput" min="50" max="99" value="80"
+        style="width:100%;accent-color:#ef4444;"
+        oninput="document.getElementById('accThreshPreview').textContent=this.value;document.getElementById('accThreshHint').textContent=this.value"/>
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:#9ca3af;margin-top:4px;">
+        <span>50 · 普通</span>
+        <span>70 · 较热</span>
+        <span>85 · 爆款</span>
+        <span>99 · 超级爆款</span>
+      </div>
+      <div style="margin-top:8px;font-size:11px;color:#6b7280;background:#f9fafb;border-radius:6px;padding:8px 10px;">
+        ⚡ 当该账号有视频爆款指数超过 <strong id="accThreshHint" style="color:#ef4444;">80</strong> 时，系统将弹窗提醒你
+      </div>
+    </div>
+
+    <div id="addAccError" style="display:none;font-size:11px;padding:8px 12px;border-radius:6px;margin-bottom:10px;color:#991b1b;background:#fef2f2;border:1px solid #fecaca;"></div>
+
+    <div style="display:flex;gap:8px;">
+      <button onclick="addAccount()" style="flex:1;padding:12px;background:#111827;border:none;border-radius:9px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans SC',sans-serif;">
+        ✅ 添加并开始监测
+      </button>
+      <button onclick="closeAddAccountModal()" style="padding:12px 16px;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:9px;color:#6b7280;font-size:12px;cursor:pointer;font-family:'Noto Sans SC',sans-serif;">
+        取消
+      </button>
+    </div>
   </div>
 </div>
 

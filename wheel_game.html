@@ -1,119 +1,76 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>幸运转盘</title>
+    <title>Wheel Game</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
         body {
-            font-family: 'Microsoft YaHei', sans-serif;
+            font-family: Arial, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             display: flex;
             flex-direction: column;
             align-items: center;
             padding: 20px;
+            margin: 0;
         }
-        
         h1 {
             color: white;
             margin-bottom: 20px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
         }
-        
         .wheel-container {
             position: relative;
-            width: 350px;
-            height: 350px;
+            width: 300px;
+            height: 300px;
             margin: 20px 0;
         }
-        
         .wheel {
             width: 100%;
             height: 100%;
             border-radius: 50%;
             position: relative;
-            overflow: hidden;
             box-shadow: 0 10px 30px rgba(0,0,0,0.3);
             transition: transform 4s cubic-bezier(0.23, 1, 0.32, 1);
         }
-        
-        .wheel-item {
-            position: absolute;
-            width: 50%;
-            height: 50%;
-            transform-origin: right bottom;
-            left: 0;
-            top: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 14px;
-            font-weight: bold;
-            color: white;
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
-            padding: 0 30px 30px 0;
-            text-align: center;
-        }
-        
         .pointer {
             position: absolute;
-            top: -20px;
+            top: -15px;
             left: 50%;
             transform: translateX(-50%);
             width: 0;
             height: 0;
-            border-left: 20px solid transparent;
-            border-right: 20px solid transparent;
-            border-top: 40px solid #ff4757;
+            border-left: 15px solid transparent;
+            border-right: 15px solid transparent;
+            border-top: 30px solid #ff4757;
             z-index: 10;
-            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
         }
-        
         .center-circle {
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 60px;
-            height: 60px;
+            width: 50px;
+            height: 50px;
             background: white;
             border-radius: 50%;
             box-shadow: 0 4px 10px rgba(0,0,0,0.3);
             z-index: 5;
         }
-        
         .btn-spin {
             background: linear-gradient(45deg, #f093fb 0%, #f5576c 100%);
             color: white;
             border: none;
             padding: 15px 50px;
-            font-size: 20px;
+            font-size: 18px;
             border-radius: 50px;
             cursor: pointer;
             box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-            transition: all 0.3s;
             margin: 20px 0;
         }
-        
-        .btn-spin:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(0,0,0,0.4);
-        }
-        
         .btn-spin:disabled {
             background: #ccc;
             cursor: not-allowed;
-            transform: none;
         }
-        
         .result {
             background: white;
             padding: 20px 40px;
@@ -121,106 +78,70 @@
             box-shadow: 0 5px 20px rgba(0,0,0,0.2);
             margin-top: 20px;
             text-align: center;
-            min-width: 300px;
+            display: none;
         }
-        
-        .result h3 {
-            color: #666;
-            margin-bottom: 10px;
-        }
-        
         .result-text {
-            font-size: 28px;
+            font-size: 24px;
             color: #764ba2;
             font-weight: bold;
         }
-        
         .settings {
             background: rgba(255,255,255,0.9);
             padding: 20px;
             border-radius: 15px;
             margin-top: 20px;
-            width: 100%;
-            max-width: 500px;
+            width: 90%;
+            max-width: 400px;
         }
-        
-        .settings h3 {
-            margin-bottom: 15px;
-            color: #333;
-        }
-        
         .item-list {
             display: flex;
             flex-wrap: wrap;
-            gap: 10px;
+            gap: 8px;
             margin-bottom: 15px;
         }
-        
         .item-tag {
             background: #667eea;
             color: white;
-            padding: 5px 15px;
-            border-radius: 20px;
-            font-size: 14px;
-            display: flex;
-            align-items: center;
-            gap: 5px;
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 12px;
         }
-        
-        .item-tag button {
-            background: none;
-            border: none;
-            color: white;
-            cursor: pointer;
-            font-size: 16px;
-        }
-        
         .add-item {
             display: flex;
             gap: 10px;
         }
-        
         .add-item input {
             flex: 1;
-            padding: 10px;
+            padding: 8px;
             border: 2px solid #667eea;
-            border-radius: 25px;
-            outline: none;
+            border-radius: 20px;
         }
-        
         .add-item button {
             background: #667eea;
             color: white;
             border: none;
-            padding: 10px 20px;
-            border-radius: 25px;
-            cursor: pointer;
-        }
-        
-        .presets {
-            margin-top: 15px;
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-        
-        .preset-btn {
-            background: #f0f0f0;
-            border: none;
             padding: 8px 15px;
             border-radius: 20px;
             cursor: pointer;
-            font-size: 12px;
         }
-        
-        .preset-btn:hover {
-            background: #667eea;
-            color: white;
+        .presets {
+            margin-top: 15px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .preset-btn {
+            background: #f0f0f0;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 11px;
         }
     </style>
 </head>
 <body>
-    <h1>🎰 幸运转盘</h1>
+    <h1>Wheel Game</h1>
     
     <div class="wheel-container">
         <div class="pointer"></div>
@@ -228,83 +149,56 @@
         <div class="center-circle"></div>
     </div>
     
-    <button class="btn-spin" id="spinBtn" onclick="spin()">开始转动</button>
+    <button class="btn-spin" id="spinBtn" onclick="spin()">SPIN</button>
     
-    <div class="result" id="result" style="display: none;">
-        <h3>🎉 恭喜获得</h3>
+    <div class="result" id="result">
         <div class="result-text" id="resultText">-</div>
     </div>
     
     <div class="settings">
-        <h3>⚙️ 转盘设置</h3>
+        <h3>Settings</h3>
         <div class="item-list" id="itemList"></div>
         <div class="add-item">
-            <input type="text" id="newItem" placeholder="输入新项目..." maxlength="20">
-            <button onclick="addItem()">添加</button>
+            <input type="text" id="newItem" placeholder="Add item..." maxlength="20">
+            <button onclick="addItem()">Add</button>
         </div>
         <div class="presets">
-            <button class="preset-btn" onclick="loadPreset('default')">默认</button>
-            <button class="preset-btn" onclick="loadPreset('food')">今天吃什么</button>
-            <button class="preset-btn" onclick="loadPreset('activity')">周末活动</button>
-            <button class="preset-btn" onclick="loadPreset('punishment')">真心话大冒险</button>
+            <button class="preset-btn" onclick="loadPreset('default')">Default</button>
+            <button class="preset-btn" onclick="loadPreset('food')">Food</button>
+            <button class="preset-btn" onclick="loadPreset('activity')">Activity</button>
         </div>
     </div>
 
     <script>
-        // 预设数据
         const presets = {
-            default: ['一等奖', '二等奖', '三等奖', '谢谢参与', '再来一次', '幸运奖'],
-            food: ['火锅', '烧烤', '日料', '西餐', '中餐', '快餐', '自己做饭', '不吃了'],
-            activity: ['看电影', '逛街', '运动', '打游戏', '读书', '睡觉', '旅行', '学习'],
-            punishment: ['真心话', '大冒险', '唱首歌', '跳个舞', '做鬼脸', '学动物叫']
+            default: ['Prize 1', 'Prize 2', 'Prize 3', 'Try Again', 'Bonus', 'Lucky'],
+            food: ['Hot Pot', 'BBQ', 'Sushi', 'Pizza', 'Burger', 'Noodles'],
+            activity: ['Movie', 'Shopping', 'Sports', 'Game', 'Read', 'Sleep']
         };
         
         let items = [...presets.default];
         let isSpinning = false;
         let currentRotation = 0;
         
-        const colors = [
-            '#f093fb', '#f5576c', '#4facfe', '#00f2fe', 
-            '#43e97b', '#fa709a', '#fee140', '#30cfd0'
-        ];
+        const colors = ['#f093fb', '#f5576c', '#4facfe', '#00f2fe', '#43e97b', '#fa709a', '#fee140', '#30cfd0'];
         
         function renderWheel() {
             const wheel = document.getElementById('wheel');
-            wheel.innerHTML = '';
             const angle = 360 / items.length;
-            
-            items.forEach((item, index) => {
-                const div = document.createElement('div');
-                div.className = 'wheel-item';
-                div.style.transform = `rotate(${index * angle}deg)`;
-                div.style.background = `conic-gradient(from 0deg, ${colors[index % colors.length]} 0deg, ${colors[(index + 1) % colors.length]} ${angle}deg)`;
-                div.style.clipPath = `polygon(0 0, 100% 0, 100% 100%)`;
-                div.innerHTML = `<span style="transform: rotate(${angle/2}deg) translateX(20px);">${item}</span>`;
-                wheel.appendChild(div);
-            });
-            
-            // 使用conic-gradient创建扇形
-            wheel.style.background = `conic-gradient(${items.map((_, i) => 
-                `${colors[i % colors.length]} ${i * angle}deg ${(i + 1) * angle}deg`
-            ).join(', ')})`;
+            wheel.style.background = `conic-gradient(${items.map((_, i) => `${colors[i % colors.length]} ${i * angle}deg ${(i + 1) * angle}deg`).join(', ')})`;
         }
         
         function renderItemList() {
             const list = document.getElementById('itemList');
             list.innerHTML = items.map((item, index) => `
                 <div class="item-tag" style="background: ${colors[index % colors.length]}">
-                    ${item}
-                    <button onclick="removeItem(${index})">×</button>
+                    ${item} <span onclick="removeItem(${index})" style="cursor:pointer;margin-left:5px;">x</span>
                 </div>
             `).join('');
         }
         
         function spin() {
-            if (isSpinning) return;
-            if (items.length < 2) {
-                alert('请至少添加2个项目！');
-                return;
-            }
+            if (isSpinning || items.length < 2) return;
             
             isSpinning = true;
             document.getElementById('spinBtn').disabled = true;
@@ -314,7 +208,7 @@
             const randomIndex = Math.floor(Math.random() * items.length);
             const anglePerItem = 360 / items.length;
             const targetAngle = 360 - (randomIndex * anglePerItem + anglePerItem / 2);
-            const spins = 5 + Math.floor(Math.random() * 3); // 5-7圈
+            const spins = 5 + Math.floor(Math.random() * 3);
             const finalRotation = currentRotation + spins * 360 + targetAngle;
             
             wheel.style.transform = `rotate(${finalRotation}deg)`;
@@ -336,8 +230,6 @@
                 input.value = '';
                 renderWheel();
                 renderItemList();
-            } else if (items.length >= 12) {
-                alert('最多只能添加12个项目！');
             }
         }
         
@@ -346,8 +238,6 @@
                 items.splice(index, 1);
                 renderWheel();
                 renderItemList();
-            } else {
-                alert('至少需要保留2个项目！');
             }
         }
         
@@ -357,12 +247,10 @@
             renderItemList();
         }
         
-        // 回车添加
         document.getElementById('newItem').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') addItem();
         });
         
-        // 初始化
         renderWheel();
         renderItemList();
     </script>

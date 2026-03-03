@@ -190,24 +190,71 @@ export async function onRequest(context) {
     }
 
     else if (endpoint === 'user_posts') {
-      const sec_uid = searchParams.get('sec_uid') || '';
-      const nickname = searchParams.get('nickname') || '';
-      const count = searchParams.get('count') || '20';
-      let apiUrl = '';
-      if (sec_uid) {
-        apiUrl = `${BASE}/api/v1/douyin/app/v3/fetch_user_post_videos?sec_user_id=${encodeURIComponent(sec_uid)}&count=${count}`;
-      } else if (nickname) {
-        apiUrl = `${BASE}/api/v1/douyin/app/v3/search_user?keyword=${encodeURIComponent(nickname)}&count=5`;
-      } else {
-        return err('请提供 sec_uid 或 nickname 参数');
+      const secUid = searchParams.get('sec_uid') || '';
+      const uniqueId = searchParams.get('unique_id') || '';
+      const count = parseInt(searchParams.get('count')) || 20;
+      
+      if (!secUid && !uniqueId) {
+        return err('请提供 sec_uid 或 unique_id 参数');
       }
+
+      // 先用 unique_id 获取 sec_uid（TikHub API 需要 sec_user_id）
+      let targetSecUid = secUid;
+      if (!targetSecUid && uniqueId) {
+        try {
+          const userRes = await fetchWithTimeout(
+            `${BASE}/api/v1/douyin/app/v3/fetch_user_info?unique_id=${encodeURIComponent(uniqueId)}`,
+            { headers: authHeaders },
+            10000
+          );
+          const userJson = await userRes.json();
+          if (userJson?.code === 200 && userJson?.data?.user?.sec_uid) {
+            targetSecUid = userJson.data.user.sec_uid;
+          }
+        } catch(e) {
+          console.warn('[user_posts] fetch user info failed:', e.message);
+        }
+      }
+      
+      if (!targetSecUid) {
+        return err('无法获取用户 sec_uid，请检查 unique_id 是否正确');
+      }
+
+      // 调用 TikHub 用户视频接口
+      const apiUrl = `${BASE}/api/v1/douyin/app/v3/fetch_user_post_videos?sec_user_id=${encodeURIComponent(targetSecUid)}&count=${count}`;
       const res = await fetchWithTimeout(apiUrl, { headers: authHeaders });
       const json = await res.json();
+      
       if (json?.code !== 200) {
         return err(json?.message_zh || json?.message || 'TikHub API 返回错误', 502, { tikhub_code: json?.code });
       }
-      const items = json?.data?.aweme_list || json?.data?.user_list || [];
-      return ok({ items, total: items.length, _source: 'tikhub' });
+      
+      const awemeList = json?.data?.aweme_list || json?.data?.videos || [];
+      
+      return ok({
+        type: 'user_posts',
+        title: '用户视频',
+        updateTime: new Date().toLocaleString('zh-CN'),
+        total: awemeList.length,
+        items: awemeList.map(v => {
+          const stat = v.statistics || v.stats || {};
+          return {
+            aweme_id: v.aweme_id || v.id || '',
+            desc: v.desc || v.title || '',
+            create_time: v.create_time || 0,
+            digg_count: stat.digg_count || stat.like_count || 0,
+            comment_count: stat.comment_count || 0,
+            share_count: stat.share_count || 0,
+            play_count: stat.play_count || 0,
+            cover_url: v.video?.cover?.url_list?.[0] || v.cover?.url_list?.[0] || '',
+            author: {
+              nickname: v.author?.nickname || '',
+              unique_id: v.author?.unique_id || '',
+              sec_uid: v.author?.sec_uid || '',
+            }
+          };
+        }),
+      });
     }
 
     else if (endpoint === 'debug') {

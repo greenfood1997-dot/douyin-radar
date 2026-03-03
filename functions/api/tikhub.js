@@ -198,26 +198,44 @@ export async function onRequest(context) {
         return err('请提供 sec_uid 或 unique_id 参数');
       }
 
-      // 先用 unique_id 获取 sec_uid（TikHub API 需要 sec_user_id）
+      // 如果已有 secUid，直接使用
       let targetSecUid = secUid;
+      
+      // 否则通过搜索该用户的视频来获取 sec_uid
       if (!targetSecUid && uniqueId) {
         try {
-          const userRes = await fetchWithTimeout(
-            `${BASE}/api/v1/douyin/app/v3/fetch_user_info?unique_id=${encodeURIComponent(uniqueId)}`,
-            { headers: authHeaders },
-            10000
+          // 搜索该 unique_id 的视频
+          const searchRes = await fetchWithTimeout(
+            `${BASE}/api/v1/douyin/search/fetch_video_search_v1`,
+            { 
+              method: 'POST', 
+              headers: authHeaders, 
+              body: JSON.stringify({ keyword: uniqueId, count: 5 }) 
+            },
+            15000
           );
-          const userJson = await userRes.json();
-          if (userJson?.code === 200 && userJson?.data?.user?.sec_uid) {
-            targetSecUid = userJson.data.user.sec_uid;
+          const searchJson = await searchRes.json();
+          
+          if (searchJson?.code === 200) {
+            // 从搜索结果中提取该用户的 sec_uid
+            const awemeList = searchJson?.data?.aweme_list || [];
+            for (const item of awemeList) {
+              const aweme = item.aweme_info || item;
+              const authorUniqueId = aweme?.author?.unique_id || aweme?.author?.short_id || '';
+              // 匹配 unique_id（不区分大小写）
+              if (authorUniqueId.toLowerCase() === uniqueId.toLowerCase()) {
+                targetSecUid = aweme?.author?.sec_uid || '';
+                if (targetSecUid) break;
+              }
+            }
           }
         } catch(e) {
-          console.warn('[user_posts] fetch user info failed:', e.message);
+          console.warn('[user_posts] search for sec_uid failed:', e.message);
         }
       }
       
       if (!targetSecUid) {
-        return err('无法获取用户 sec_uid，请检查 unique_id 是否正确');
+        return err('无法获取用户 sec_uid，请检查 unique_id 是否正确或该用户是否有公开视频');
       }
 
       // 调用 TikHub 用户视频接口

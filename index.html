@@ -1859,19 +1859,36 @@ async function refreshFeed(isFirst) {
       let allResults = [];
 
       if (trackList && trackList.length > 0) {
-        // ✅ 按每个赛道关键词搜索真实视频
+        // ✅ 并行搜索赛道下所有关键词，增加数据覆盖
+        const searchPromises = [];
         for (const track of trackList) {
-          // 取该赛道第一个关键词作为搜索词（最精准）
           const kws = TRACK_KEYWORDS[track] || [track];
-          const searchKw = kws[0];
-
-          const items = await fetchViaTikHub(searchKw);
-          if (items && items.length > 0) {
-            items.forEach(item => {
-              allResults.push({ ...item, _track: track });
-            });
+          // 并行搜索该赛道所有关键词
+          for (const kw of kws) {
+            searchPromises.push(
+              fetchViaTikHub(kw, 20).then(items => {
+                if (items && items.length > 0) {
+                  items.forEach(item => {
+                    allResults.push({ ...item, _track: track, _keyword: kw });
+                  });
+                }
+              }).catch(e => console.warn('[refreshFeed] search failed:', kw, e.message))
+            );
           }
         }
+        await Promise.all(searchPromises);
+        
+        // 去重：按 aweme_id 去重
+        const seen = new Set();
+        const uniqueResults = [];
+        for (const item of allResults) {
+          const id = item.aweme_id || item.desc;
+          if (!seen.has(id)) {
+            seen.add(id);
+            uniqueResults.push(item);
+          }
+        }
+        allResults = uniqueResults;
       }
 
       // 如果赛道搜索有结果，直接用
@@ -2760,13 +2777,13 @@ function normalizeAweme(raw, track) {
 // 原理：调用 Anthropic API，让 AI 联网搜索抖音真实热门视频，返回结构化数据
 // 优点：无 CORS 问题，file:// 可用，不需要 TikHub 账户
 // ── TikHub 数据（通过本站 /api/tikhub 中转，无 CORS 问题）──────────
-async function fetchViaTikHub(keyword) {
+async function fetchViaTikHub(keyword, count = 20) {
   const key = localStorage.getItem('tikhub_key') || localStorage.getItem('ds_key') || _dsKey;
   if (!key) return null;
 
   // 先尝试关键词搜索，再fallback到热搜榜
   const requests = [
-    { url: `/api/tikhub?endpoint=search&keyword=${encodeURIComponent(keyword)}`, type: 'search' },
+    { url: `/api/tikhub?endpoint=search&keyword=${encodeURIComponent(keyword)}&count=${count}`, type: 'search' },
     { url: `/api/tikhub?endpoint=hot_search`, type: 'hot_search' },
   ];
 

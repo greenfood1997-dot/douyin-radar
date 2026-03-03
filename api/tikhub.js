@@ -123,7 +123,8 @@ export default async function handler(req) {
         }
       };
 
-      const searchBody = { keyword, count: 20 };
+      const count = parseInt(searchParams.get('count')) || 20;
+      const searchBody = { keyword, count };
       const [r1, r2, r3, r4] = await Promise.all([
         tryFetch(`${BASE}/api/v1/douyin/search/fetch_video_search_v1`, 'search_v1', searchBody),
         tryFetch(`${BASE}/api/v1/douyin/search/fetch_video_search_v2`, 'search_v2', searchBody),

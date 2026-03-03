@@ -218,7 +218,8 @@ export async function onRequest(context) {
           
           if (searchJson?.code === 200) {
             // 从搜索结果中提取该用户的 sec_uid
-            const awemeList = searchJson?.data?.aweme_list || [];
+            // TikHub API 返回的数据在 data.data 中，不是 data.aweme_list
+            const awemeList = searchJson?.data?.aweme_list || searchJson?.data?.data || [];
             for (const item of awemeList) {
               const aweme = item.aweme_info || item;
               const authorUniqueId = aweme?.author?.unique_id || aweme?.author?.short_id || '';

@@ -182,13 +182,49 @@ export default async function handler(req) {
         return err('请提供 sec_uid 或 unique_id 参数');
       }
 
-      // 构建URL参数
-      let url = `${BASE}/api/v1/douyin/app/v3/fetch_user_post_videos?count=${count}`;
-      if (secUid) {
-        url += `&sec_uid=${encodeURIComponent(secUid)}`;
-      } else {
-        url += `&unique_id=${encodeURIComponent(uniqueId)}`;
+      // 如果已有 secUid，直接使用
+      let targetSecUid = secUid;
+      
+      // 否则通过搜索该用户的视频来获取 sec_uid
+      if (!targetSecUid && uniqueId) {
+        try {
+          // 搜索该 unique_id 的视频
+          const searchRes = await fetchWithTimeout(
+            `${BASE}/api/v1/douyin/search/fetch_video_search_v1`,
+            { 
+              method: 'POST', 
+              headers: authHeaders, 
+              body: JSON.stringify({ keyword: uniqueId, count: 5 }) 
+            },
+            15000
+          );
+          const searchJson = await searchRes.json();
+          
+          if (searchJson?.code === 200) {
+            // 从搜索结果中提取该用户的 sec_uid
+            // TikHub API 返回的数据在 data.data 中
+            const awemeList = searchJson?.data?.aweme_list || searchJson?.data?.data || [];
+            for (const item of awemeList) {
+              const aweme = item.aweme_info || item;
+              const authorUniqueId = aweme?.author?.unique_id || aweme?.author?.short_id || '';
+              // 匹配 unique_id（不区分大小写）
+              if (authorUniqueId.toLowerCase() === uniqueId.toLowerCase()) {
+                targetSecUid = aweme?.author?.sec_uid || '';
+                if (targetSecUid) break;
+              }
+            }
+          }
+        } catch(e) {
+          console.warn('[user_posts] search for sec_uid failed:', e.message);
+        }
       }
+      
+      if (!targetSecUid) {
+        return err('无法获取用户 sec_uid，请检查 unique_id 是否正确或该用户是否有公开视频');
+      }
+
+      // 构建URL参数
+      const url = `${BASE}/api/v1/douyin/app/v3/fetch_user_post_videos?sec_user_id=${encodeURIComponent(targetSecUid)}&count=${count}`;
 
       const res = await fetchWithTimeout(url, { headers: authHeaders }, 15000);
       const json = await res.json();

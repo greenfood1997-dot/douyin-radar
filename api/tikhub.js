@@ -188,17 +188,17 @@ export default async function handler(req) {
       // 否则通过搜索该用户的视频来获取 sec_uid
       if (!targetSecUid && uniqueId) {
         try {
-          // 搜索该 unique_id 的视频
-          const searchRes = await fetchWithTimeout(
+          // 策略1: 直接搜索 unique_id
+          let searchRes = await fetchWithTimeout(
             `${BASE}/api/v1/douyin/search/fetch_video_search_v1`,
             { 
               method: 'POST', 
               headers: authHeaders, 
-              body: JSON.stringify({ keyword: uniqueId, count: 5 }) 
+              body: JSON.stringify({ keyword: uniqueId, count: 10 }) 
             },
             15000
           );
-          const searchJson = await searchRes.json();
+          let searchJson = await searchRes.json();
           
           if (searchJson?.code === 200) {
             // 从搜索结果中提取该用户的 sec_uid
@@ -206,12 +206,55 @@ export default async function handler(req) {
             const awemeList = searchJson?.data?.aweme_list || searchJson?.data?.data || [];
             for (const item of awemeList) {
               const aweme = item.aweme_info || item;
-              const authorUniqueId = aweme?.author?.unique_id || aweme?.author?.short_id || '';
-              // 匹配 unique_id（不区分大小写）
+              const author = aweme?.author || {};
+              const authorUniqueId = author.unique_id || author.short_id || '';
+              // 匹配 unique_id 或 short_id（不区分大小写）
               if (authorUniqueId.toLowerCase() === uniqueId.toLowerCase()) {
-                targetSecUid = aweme?.author?.sec_uid || '';
+                targetSecUid = author.sec_uid || '';
                 if (targetSecUid) break;
               }
+            }
+          }
+          
+          // 策略2: 如果没找到，尝试搜索昵称（从user_info获取昵称）
+          if (!targetSecUid) {
+            try {
+              const userRes = await fetchWithTimeout(
+                `${BASE}/api/v1/douyin/app/v3/fetch_user_info?unique_id=${encodeURIComponent(uniqueId)}`,
+                { headers: authHeaders },
+                10000
+              );
+              const userJson = await userRes.json();
+              if (userJson?.code === 200 && userJson?.data?.user?.nickname) {
+                const nickname = userJson.data.user.nickname;
+                
+                // 用昵称搜索
+                searchRes = await fetchWithTimeout(
+                  `${BASE}/api/v1/douyin/search/fetch_video_search_v1`,
+                  { 
+                    method: 'POST', 
+                    headers: authHeaders, 
+                    body: JSON.stringify({ keyword: nickname, count: 10 }) 
+                  },
+                  15000
+                );
+                searchJson = await searchRes.json();
+                
+                if (searchJson?.code === 200) {
+                  const awemeList = searchJson?.data?.aweme_list || searchJson?.data?.data || [];
+                  for (const item of awemeList) {
+                    const aweme = item.aweme_info || item;
+                    const author = aweme?.author || {};
+                    // 匹配 unique_id
+                    if (author.unique_id === uniqueId && author.sec_uid) {
+                      targetSecUid = author.sec_uid;
+                      break;
+                    }
+                  }
+                }
+              }
+            } catch(e2) {
+              console.warn('[user_posts] search by nickname failed:', e2.message);
             }
           }
         } catch(e) {

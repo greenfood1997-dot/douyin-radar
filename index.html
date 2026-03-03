@@ -1330,21 +1330,33 @@ async function checkAccountsOnce() {
       try {
         const result = await fetchUserPosts(acc, tikhubKey);
         if (result.items && result.items.length > 0) {
-          detectedVideos = result.items.map(item => ({
-            aweme_id: item.aweme_id || '',
-            title:    item.desc || item.fullDesc || '',
-            heat:     item.heatScore || 75,
-            likes:    item.diggStr || '0',
-            comments: item.commentStr || '0',
-            shares:   item.shareStr || '0',
-            plays:    item.playStr || '0',
-            track:    acc.nick,
-            emoji:    acc.avatar,
-            isNew:    true,
-            trend:    '+',
-            trendVal: Math.max(1, (item.heatScore || 75) - 70),
-            source:   'real',
-          }));
+          detectedVideos = result.items.map(item => {
+            // 计算热度分数（基于播放量、点赞、评论、分享）
+            const playCount = item.play_count || 0;
+            const diggCount = item.digg_count || 0;
+            const commentCount = item.comment_count || 0;
+            const shareCount = item.share_count || 0;
+            // 热度算法：播放量/1000 + 点赞/100 + 评论/10 + 分享
+            const heatScore = Math.min(99, Math.floor(
+              playCount / 10000 + diggCount / 1000 + commentCount / 100 + shareCount / 50
+            ));
+            
+            return {
+              aweme_id: item.aweme_id || '',
+              title:    item.desc || '',
+              heat:     heatScore || 75,
+              likes:    diggCount > 10000 ? (diggCount/10000).toFixed(1)+'万' : String(diggCount),
+              comments: commentCount > 10000 ? (commentCount/10000).toFixed(1)+'万' : String(commentCount),
+              shares:   shareCount > 10000 ? (shareCount/10000).toFixed(1)+'万' : String(shareCount),
+              plays:    playCount > 10000 ? (playCount/10000).toFixed(1)+'万' : String(playCount),
+              track:    acc.nick,
+              emoji:    acc.avatar,
+              isNew:    true,
+              trend:    '+',
+              trendVal: Math.max(1, heatScore - 70),
+              source:   'real',
+            };
+          });
           acc._dataSource = 'real';
         } else if (result._hint) {
           // 接口通了但无视频，记录提示

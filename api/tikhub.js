@@ -171,6 +171,72 @@ export default async function handler(req) {
     }
 
     // ════════════════════════════════════════
+    // 用户视频列表 —— 账号监测用
+    // ════════════════════════════════════════
+    else if (endpoint === 'user_posts') {
+      const secUid = searchParams.get('sec_uid') || '';
+      const uniqueId = searchParams.get('unique_id') || '';
+      const count = parseInt(searchParams.get('count')) || 20;
+      
+      if (!secUid && !uniqueId) {
+        return err('请提供 sec_uid 或 unique_id 参数');
+      }
+
+      // 构建URL参数
+      let url = `${BASE}/api/v1/douyin/app/v3/fetch_user_post_videos?count=${count}`;
+      if (secUid) {
+        url += `&sec_uid=${encodeURIComponent(secUid)}`;
+      } else {
+        url += `&unique_id=${encodeURIComponent(uniqueId)}`;
+      }
+
+      const res = await fetchWithTimeout(url, { headers: authHeaders }, 15000);
+      const json = await res.json();
+
+      if (json?.code !== 200) {
+        return err(json?.message_zh || json?.message || 'TikHub API 返回错误', 502,
+          { tikhub_code: json?.code, raw: JSON.stringify(json).slice(0, 300) });
+      }
+
+      const awemeList = json?.data?.aweme_list || json?.data?.videos || json?.data?.list || [];
+      
+      if (!awemeList || awemeList.length === 0) {
+        return ok({ 
+          type: 'user_posts', 
+          title: '用户视频',
+          updateTime: new Date().toLocaleString('zh-CN'), 
+          items: [],
+          _hint: '该用户暂无视频或需要更换查询方式'
+        });
+      }
+
+      return ok({
+        type: 'user_posts', 
+        title: '用户视频',
+        updateTime: new Date().toLocaleString('zh-CN'),
+        total: awemeList.length,
+        items: awemeList.map(v => {
+          const stat = v.statistics || v.stats || {};
+          return {
+            aweme_id: v.aweme_id || v.id || '',
+            desc: v.desc || v.title || '',
+            create_time: v.create_time || 0,
+            digg_count: stat.digg_count || stat.like_count || 0,
+            comment_count: stat.comment_count || 0,
+            share_count: stat.share_count || 0,
+            play_count: stat.play_count || 0,
+            cover_url: v.video?.cover?.url_list?.[0] || v.cover?.url_list?.[0] || '',
+            author: {
+              nickname: v.author?.nickname || '',
+              unique_id: v.author?.unique_id || '',
+              sec_uid: v.author?.sec_uid || '',
+            }
+          };
+        }),
+      });
+    }
+
+    // ════════════════════════════════════════
     // 达人信息
     // ════════════════════════════════════════
     else if (endpoint === 'user_info') {

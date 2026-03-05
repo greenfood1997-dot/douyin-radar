@@ -1413,7 +1413,7 @@ async function checkAccountsOnce() {
 }
 
 function triggerViralAlert(acc, video) {
-  // 记录到日志
+  // 记录到日志（保存 url 和 aweme_id 用于精准跳转）
   accAlerts.unshift({
     account: acc.nick,
     avatar: acc.avatar,
@@ -1421,6 +1421,8 @@ function triggerViralAlert(acc, video) {
     heat: video.heat,
     likes: video.likes,
     time: new Date().toLocaleString('zh-CN'),
+    url: acc.url || '',
+    aweme_id: video.aweme_id || '',
   });
   if (accAlerts.length > 50) accAlerts.pop();
 
@@ -1476,7 +1478,7 @@ function showViralPopup(acc, video) {
       </div>
 
       <div style="display:flex;gap:10px;">
-        <button onclick="goToVideoFromAlert('${encodeURIComponent(video.title)}','${video.aweme_id||''}')"
+        <button onclick="goToVideoFromAlert('${encodeURIComponent(video.title)}','${video.aweme_id||''}','${encodeURIComponent(acc.url||'')}')"
           style="flex:1;padding:12px;background:var(--accent);border:none;border-radius:10px;
           color:white;font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans SC',sans-serif;">
           🔥 立即查看视频
@@ -1496,12 +1498,21 @@ function showViralPopup(acc, video) {
   setTimeout(() => { if (document.getElementById('viralPopup')) document.getElementById('viralPopup').remove(); }, 5000);
 }
 
-function goToVideoFromAlert(titleEnc, awemeId) {
+function goToVideoFromAlert(titleEnc, awemeId, accUrlEnc) {
   document.getElementById('viralPopup')?.remove();
   const title = decodeURIComponent(titleEnc);
-  if (awemeId && !awemeId.startsWith('builtin_') && !awemeId.startsWith('hot_')) {
+  const accUrl = accUrlEnc ? decodeURIComponent(accUrlEnc) : '';
+
+  // 优先级1：有真实 aweme_id → 跳转具体视频页
+  if (awemeId && !awemeId.startsWith('builtin_') && !awemeId.startsWith('hot_') && !awemeId.startsWith('ai_') && !awemeId.startsWith('custom_')) {
     window.open('https://www.douyin.com/video/' + awemeId, '_blank');
-  } else {
+  }
+  // 优先级2：有账号主页 URL → 跳转账号主页（内容相关，100%不跑偏）
+  else if (accUrl && (accUrl.includes('douyin.com/') || accUrl.startsWith('http'))) {
+    window.open(accUrl, '_blank');
+  }
+  // 优先级3：标题搜索（演示模式兜底）
+  else {
     window.open('https://www.douyin.com/search/' + encodeURIComponent(title) + '?type=video&sort_type=1', '_blank');
   }
 }
@@ -1513,17 +1524,24 @@ function renderAccAlertLog() {
     container.innerHTML = `<div class="empty" style="padding:32px;"><div class="empty-icon">🔔</div><div class="empty-text">启动监测后，爆款内容将在此记录</div></div>`;
     return;
   }
-  container.innerHTML = accAlerts.map(a => `
-    <div style="display:flex;gap:12px;align-items:flex-start;padding:14px 20px;border-bottom:1px solid rgba(42,45,62,0.5);">
+  container.innerHTML = accAlerts.map(a => {
+    // 精准跳转逻辑：真实视频ID > 账号主页URL > 标题搜索
+    const jumpUrl = (a.aweme_id && !a.aweme_id.startsWith('builtin_') && !a.aweme_id.startsWith('hot_') && !a.aweme_id.startsWith('ai_') && !a.aweme_id.startsWith('custom_'))
+      ? 'https://www.douyin.com/video/' + a.aweme_id
+      : (a.url && a.url.includes('douyin.com/'))
+        ? a.url
+        : 'https://www.douyin.com/search/' + encodeURIComponent(a.title) + '?type=video&sort_type=1';
+    return `
+    <div style="display:flex;gap:12px;align-items:flex-start;padding:14px 20px;border-bottom:1px solid rgba(42,45,62,0.5);cursor:pointer;transition:background 0.15s;" onclick="window.open('${jumpUrl}','_blank')" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='transparent'">
       <div style="font-size:22px;flex-shrink:0;">${a.avatar}</div>
       <div style="flex:1;min-width:0;">
         <div style="font-size:11px;color:var(--accent);font-weight:700;margin-bottom:3px;">🔥 ${a.account} · 爆款预警</div>
         <div style="font-size:12px;color:var(--text);line-height:1.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${a.title}</div>
-        <div style="font-size:10px;color:var(--muted);margin-top:4px;font-family:'IBM Plex Mono',monospace;">${a.time}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:4px;font-family:'IBM Plex Mono',monospace;">${a.time} &nbsp;·&nbsp; <span style="color:var(--accent2);">点击查看 ↗</span></div>
       </div>
       <div style="font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:900;color:var(--accent);flex-shrink:0;">${a.heat}</div>
-    </div>
-  `).join('');
+    </div>`
+  }).join('');
 }
 
 function clearAccAlerts() {

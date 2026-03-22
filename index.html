@@ -180,7 +180,7 @@ header {
   font-family:'IBM Plex Mono',monospace;letter-spacing:1px;
 }
 
-.feed-list{max-height:480px;overflow-y:auto;}
+.feed-list{max-height:640px;overflow-y:auto;}
 .feed-list::-webkit-scrollbar{width:3px;}
 .feed-list::-webkit-scrollbar-track{background:transparent;}
 .feed-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
@@ -1507,6 +1507,8 @@ let analysisResult = '';
 let pastedData = '';
 let savedReports = [];
 let feedData = [];
+let feedPage = 1;          // 当前已显示的页数
+const FEED_PAGE_SIZE = 20; // 每页条数
 let alertCount = 0;
 let trendData = [];
 
@@ -1802,7 +1804,7 @@ async function refreshFeed(isFirst) {
           // 并行搜索该赛道所有关键词
           for (const kw of kws) {
             searchPromises.push(
-              fetchViaTikHub(kw, 20).then(items => {
+              fetchViaTikHub(kw, 50).then(items => {
                 if (items && items.length > 0) {
                   items.forEach(item => {
                     allResults.push({ ...item, _track: track, _keyword: kw });
@@ -1914,6 +1916,8 @@ async function fetchHotSearch() {
 }
 
 function renderFeed(isFirst) {
+  if (isFirst) feedPage = 1; // 新数据到来时重置到第一页
+
   const list = document.getElementById('feedList');
   let data = [...feedData];
   if(feedFilter === 'new') data = data.filter(v => v.isNew);
@@ -1926,11 +1930,16 @@ function renderFeed(isFirst) {
     return;
   }
 
-  list.innerHTML = data.map((v, i) => {
+  // 只显示到当前页为止的数据，最多 200 条
+  const maxShow = Math.min(feedPage * FEED_PAGE_SIZE, 200);
+  const visible = data.slice(0, maxShow);
+  const hasMore = data.length > maxShow && maxShow < 200;
+
+  const itemsHtml = visible.map((v, i) => {
     const rankClass = i===0?'r1':i===1?'r2':i===2?'r3':'rn';
-    const isAnimNew = !isFirst && v.isNew;
+    const isAnimNew = !isFirst && v.isNew && i < FEED_PAGE_SIZE; // 只给新加载的前几条加动画
     return `
-    <div class="feed-item ${isAnimNew?'new-item':''}" style="animation-delay:${i*0.04}s" onclick="feedItemClick(${i})">
+    <div class="feed-item ${isAnimNew?'new-item':''}" style="animation-delay:${(i % FEED_PAGE_SIZE)*0.04}s" onclick="feedItemClick(${i})">
       <div class="feed-rank ${rankClass}">${i+1}</div>
       <div class="feed-thumb"><div class="feed-thumb-overlay"></div><span style="position:relative;font-size:20px">${v.emoji}</span></div>
       <div class="feed-info">
@@ -1952,6 +1961,42 @@ function renderFeed(isFirst) {
       </div>
     </div>`;
   }).join('');
+
+  // 加载更多按钮
+  const loadMoreHtml = hasMore ? `
+    <div id="loadMoreBar" style="padding:14px 20px;text-align:center;border-top:1px solid var(--border);">
+      <button onclick="loadMoreFeed()" style="
+        background:var(--surface2);border:1px solid var(--border);border-radius:8px;
+        color:var(--text);font-size:12px;font-weight:600;padding:9px 28px;cursor:pointer;
+        font-family:'Noto Sans SC',sans-serif;transition:all 0.15s;
+        display:inline-flex;align-items:center;gap:8px;
+      " onmouseover="this.style.borderColor='var(--accent2)';this.style.color='var(--accent2)'"
+         onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text)'">
+        ↓ 加载更多
+        <span style="font-size:10px;color:var(--muted);font-family:'IBM Plex Mono',monospace;">
+          ${visible.length} / ${Math.min(data.length, 200)}
+        </span>
+      </button>
+    </div>` : (data.length > FEED_PAGE_SIZE ? `
+    <div style="padding:12px 20px;text-align:center;border-top:1px solid var(--border);">
+      <span style="font-size:11px;color:var(--muted);font-family:'IBM Plex Mono',monospace;">
+        ✓ 已显示全部 ${visible.length} 条
+      </span>
+    </div>` : '');
+
+  list.innerHTML = itemsHtml + loadMoreHtml;
+}
+
+function loadMoreFeed() {
+  feedPage += 1;
+  // 记录当前滚动位置，追加后恢复
+  const list = document.getElementById('feedList');
+  const scrollTop = list.scrollTop;
+  renderFeed(false);
+  list.scrollTop = scrollTop;
+  // 平滑滚动到新内容
+  const bar = document.getElementById('loadMoreBar');
+  if (bar) bar.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 function feedItemClick(idx) {
@@ -1971,6 +2016,7 @@ function setFeedFilter(btn, filter) {
   document.querySelectorAll('[id^="ff-"]').forEach(b => { b.className='btn btn-ghost btn-sm'; });
   btn.className='btn btn-red btn-sm';
   feedFilter = filter;
+  feedPage = 1; // 切换筛选时重置页码
   renderFeed(false);
 }
 
@@ -2713,7 +2759,7 @@ function normalizeAweme(raw, track) {
 // 原理：调用 Anthropic API，让 AI 联网搜索抖音真实热门视频，返回结构化数据
 // 优点：无 CORS 问题，file:// 可用，不需要 TikHub 账户
 // ── TikHub 数据（通过本站 /api/tikhub 中转，无 CORS 问题）──────────
-async function fetchViaTikHub(keyword, count = 20) {
+async function fetchViaTikHub(keyword, count = 50) {
   const key = localStorage.getItem('tikhub_key') || localStorage.getItem('ds_key') || _dsKey;
   if (!key) return null;
 

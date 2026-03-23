@@ -180,7 +180,7 @@ header {
   font-family:'IBM Plex Mono',monospace;letter-spacing:1px;
 }
 
-.feed-list{max-height:640px;overflow-y:auto;}
+.feed-list{max-height:480px;overflow-y:auto;}
 .feed-list::-webkit-scrollbar{width:3px;}
 .feed-list::-webkit-scrollbar-track{background:transparent;}
 .feed-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
@@ -696,6 +696,50 @@ header {
     </div>
     <button class="btn btn-red btn-sm" onclick="confirmTracks()">开始监测 →</button>
   </div>
+
+  <!-- ════ 抖音热榜实时区 ════ -->
+  <div style="margin-bottom:20px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:8px;">
+          🔥 抖音热榜 · 实时同步
+          <span id="hotlistSyncBadge" style="font-size:9px;background:rgba(255,51,85,0.1);border:1px solid rgba(255,51,85,0.25);color:var(--accent);border-radius:3px;padding:2px 7px;font-family:'IBM Plex Mono',monospace;display:none;">● 实时同步</span>
+          <span id="hotlistDemoBadge" style="font-size:9px;background:rgba(107,114,128,0.1);border:1px solid rgba(107,114,128,0.25);color:var(--muted);border-radius:3px;padding:2px 7px;font-family:'IBM Plex Mono',monospace;">演示数据</span>
+        </div>
+        <span id="hotlistTime" style="font-size:9px;color:var(--muted);font-family:'IBM Plex Mono',monospace;"></span>
+      </div>
+      <button onclick="fetchHotListForTrack()" id="hotlistRefreshBtn"
+        style="padding:5px 12px;background:rgba(255,51,85,0.1);border:1px solid rgba(255,51,85,0.25);border-radius:6px;font-size:11px;color:var(--accent);cursor:pointer;font-family:'Noto Sans SC',sans-serif;display:flex;align-items:center;gap:5px;transition:all 0.15s;"
+        onmouseover="this.style.background='rgba(255,51,85,0.18)'" onmouseout="this.style.background='rgba(255,51,85,0.1)'">
+        ↻ 刷新热榜
+      </button>
+    </div>
+
+    <div id="hotlistContainer" style="background:var(--surface);border:1.5px solid var(--border);border-radius:14px;overflow:hidden;">
+      <!-- 热榜 tabs -->
+      <div style="display:flex;border-bottom:1px solid var(--border);overflow-x:auto;">
+        <button class="hotlist-tab active" onclick="setHotlistTab('hot',this)" style="padding:10px 18px;font-size:12px;font-weight:600;border:none;background:transparent;color:var(--accent);cursor:pointer;white-space:nowrap;border-bottom:2px solid var(--accent);font-family:'Noto Sans SC',sans-serif;">🔥 抖音热搜</button>
+        <button class="hotlist-tab" onclick="setHotlistTab('entertain',this)" style="padding:10px 18px;font-size:12px;font-weight:500;border:none;background:transparent;color:var(--muted);cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent;font-family:'Noto Sans SC',sans-serif;">🎬 娱乐</button>
+        <button class="hotlist-tab" onclick="setHotlistTab('society',this)" style="padding:10px 18px;font-size:12px;font-weight:500;border:none;background:transparent;color:var(--muted);cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent;font-family:'Noto Sans SC',sans-serif;">📰 社会</button>
+        <button class="hotlist-tab" onclick="setHotlistTab('finance',this)" style="padding:10px 18px;font-size:12px;font-weight:500;border:none;background:transparent;color:var(--muted);cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent;font-family:'Noto Sans SC',sans-serif;">💹 财经</button>
+        <button class="hotlist-tab" onclick="setHotlistTab('sports',this)" style="padding:10px 18px;font-size:12px;font-weight:500;border:none;background:transparent;color:var(--muted);cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent;font-family:'Noto Sans SC',sans-serif;">🏆 体育</button>
+        <button class="hotlist-tab" onclick="setHotlistTab('tech',this)" style="padding:10px 18px;font-size:12px;font-weight:500;border:none;background:transparent;color:var(--muted);cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent;font-family:'Noto Sans SC',sans-serif;">🔬 科技</button>
+      </div>
+      <!-- 列表区 -->
+      <div id="hotlistBody" style="max-height:420px;overflow-y:auto;">
+        <div style="padding:40px 20px;text-align:center;color:var(--muted);font-size:13px;">
+          <div style="font-size:28px;margin-bottom:10px;opacity:0.4;">🔥</div>
+          正在加载热榜数据…
+        </div>
+      </div>
+      <!-- 底部提示 -->
+      <div style="padding:10px 18px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:10px;color:var(--muted);">💡 点击热榜词 → 自动添加为自定义赛道并监测</span>
+        <span id="hotlistCount" style="font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--muted);">—</span>
+      </div>
+    </div>
+  </div>
+  <!-- ════ END 热榜区 ════ -->
 
   <div class="section-label">热门赛道 · 点击选择（可多选）</div>
   <div class="track-grid-full" id="trackGrid"></div>
@@ -1507,8 +1551,6 @@ let analysisResult = '';
 let pastedData = '';
 let savedReports = [];
 let feedData = [];
-let feedPage = 1;          // 当前已显示的页数
-const FEED_PAGE_SIZE = 20; // 每页条数
 let alertCount = 0;
 let trendData = [];
 
@@ -1567,6 +1609,10 @@ function switchView(name, el) {
     renderAccountList();
     updateAccBadge();
     renderAccAlertLog();
+  }
+  // 切换到赛道选取时加载热榜
+  if (name === 'track' && !_hotlistLoaded) {
+    fetchHotListForTrack();
   }
 }
 
@@ -1804,7 +1850,7 @@ async function refreshFeed(isFirst) {
           // 并行搜索该赛道所有关键词
           for (const kw of kws) {
             searchPromises.push(
-              fetchViaTikHub(kw, 50).then(items => {
+              fetchViaTikHub(kw, 20).then(items => {
                 if (items && items.length > 0) {
                   items.forEach(item => {
                     allResults.push({ ...item, _track: track, _keyword: kw });
@@ -1916,8 +1962,6 @@ async function fetchHotSearch() {
 }
 
 function renderFeed(isFirst) {
-  if (isFirst) feedPage = 1; // 新数据到来时重置到第一页
-
   const list = document.getElementById('feedList');
   let data = [...feedData];
   if(feedFilter === 'new') data = data.filter(v => v.isNew);
@@ -1930,16 +1974,11 @@ function renderFeed(isFirst) {
     return;
   }
 
-  // 只显示到当前页为止的数据，最多 200 条
-  const maxShow = Math.min(feedPage * FEED_PAGE_SIZE, 200);
-  const visible = data.slice(0, maxShow);
-  const hasMore = data.length > maxShow && maxShow < 200;
-
-  const itemsHtml = visible.map((v, i) => {
+  list.innerHTML = data.map((v, i) => {
     const rankClass = i===0?'r1':i===1?'r2':i===2?'r3':'rn';
-    const isAnimNew = !isFirst && v.isNew && i < FEED_PAGE_SIZE; // 只给新加载的前几条加动画
+    const isAnimNew = !isFirst && v.isNew;
     return `
-    <div class="feed-item ${isAnimNew?'new-item':''}" style="animation-delay:${(i % FEED_PAGE_SIZE)*0.04}s" onclick="feedItemClick(${i})">
+    <div class="feed-item ${isAnimNew?'new-item':''}" style="animation-delay:${i*0.04}s" onclick="feedItemClick(${i})">
       <div class="feed-rank ${rankClass}">${i+1}</div>
       <div class="feed-thumb"><div class="feed-thumb-overlay"></div><span style="position:relative;font-size:20px">${v.emoji}</span></div>
       <div class="feed-info">
@@ -1961,42 +2000,6 @@ function renderFeed(isFirst) {
       </div>
     </div>`;
   }).join('');
-
-  // 加载更多按钮
-  const loadMoreHtml = hasMore ? `
-    <div id="loadMoreBar" style="padding:14px 20px;text-align:center;border-top:1px solid var(--border);">
-      <button onclick="loadMoreFeed()" style="
-        background:var(--surface2);border:1px solid var(--border);border-radius:8px;
-        color:var(--text);font-size:12px;font-weight:600;padding:9px 28px;cursor:pointer;
-        font-family:'Noto Sans SC',sans-serif;transition:all 0.15s;
-        display:inline-flex;align-items:center;gap:8px;
-      " onmouseover="this.style.borderColor='var(--accent2)';this.style.color='var(--accent2)'"
-         onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text)'">
-        ↓ 加载更多
-        <span style="font-size:10px;color:var(--muted);font-family:'IBM Plex Mono',monospace;">
-          ${visible.length} / ${Math.min(data.length, 200)}
-        </span>
-      </button>
-    </div>` : (data.length > FEED_PAGE_SIZE ? `
-    <div style="padding:12px 20px;text-align:center;border-top:1px solid var(--border);">
-      <span style="font-size:11px;color:var(--muted);font-family:'IBM Plex Mono',monospace;">
-        ✓ 已显示全部 ${visible.length} 条
-      </span>
-    </div>` : '');
-
-  list.innerHTML = itemsHtml + loadMoreHtml;
-}
-
-function loadMoreFeed() {
-  feedPage += 1;
-  // 记录当前滚动位置，追加后恢复
-  const list = document.getElementById('feedList');
-  const scrollTop = list.scrollTop;
-  renderFeed(false);
-  list.scrollTop = scrollTop;
-  // 平滑滚动到新内容
-  const bar = document.getElementById('loadMoreBar');
-  if (bar) bar.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 function feedItemClick(idx) {
@@ -2016,7 +2019,6 @@ function setFeedFilter(btn, filter) {
   document.querySelectorAll('[id^="ff-"]').forEach(b => { b.className='btn btn-ghost btn-sm'; });
   btn.className='btn btn-red btn-sm';
   feedFilter = filter;
-  feedPage = 1; // 切换筛选时重置页码
   renderFeed(false);
 }
 
@@ -2759,7 +2761,7 @@ function normalizeAweme(raw, track) {
 // 原理：调用 Anthropic API，让 AI 联网搜索抖音真实热门视频，返回结构化数据
 // 优点：无 CORS 问题，file:// 可用，不需要 TikHub 账户
 // ── TikHub 数据（通过本站 /api/tikhub 中转，无 CORS 问题）──────────
-async function fetchViaTikHub(keyword, count = 50) {
+async function fetchViaTikHub(keyword, count = 20) {
   const key = localStorage.getItem('tikhub_key') || localStorage.getItem('ds_key') || _dsKey;
   if (!key) return null;
 
@@ -3008,6 +3010,273 @@ function _refreshDsBadges() {
     btn.textContent       = ok ? '✅ 真实数据' : '📡 数据源';
   }
 }
+
+// ════════════════════════════════════════════════════════
+// 抖音热榜模块 - 实时同步 / 演示双模式
+// ════════════════════════════════════════════════════════
+
+let _hotlistData = {};           // { tabKey: [items] }
+let _hotlistCurrentTab = 'hot';  // 当前tab
+let _hotlistLoaded = false;
+
+// 分类关键词映射（用于演示数据过滤 + 从真实热搜里分类）
+const HOTLIST_CATEGORY_FILTERS = {
+  hot:       () => true,
+  entertain: w => /娱乐|明星|电影|电视|综艺|演唱会|歌手|演员|音乐|剧|热播|追剧|翻拍/.test(w),
+  society:   w => /社会|新闻|事件|民生|政策|教育|校园|房价|物价|医疗|案件|灾难/.test(w),
+  finance:   w => /财经|股市|理财|基金|投资|经济|行情|上市|企业|商业|油价|汇率/.test(w),
+  sports:    w => /体育|足球|篮球|运动|比赛|冠军|奥运|世界杯|联赛|选手|乒乓|羽毛球/.test(w),
+  tech:      w => /科技|手机|AI|人工智能|算法|芯片|发射|航天|卫星|数字|互联网|5G|智能/.test(w),
+};
+
+// 演示数据（当无真实Key时显示）
+const HOTLIST_DEMO = {
+  hot: [
+    {rank:1, word:'3月23日24时油价上调', hotValue:12108000, tag:'新'},
+    {rank:2, word:'大疆起诉影石', hotValue:11772000, tag:'热'},
+    {rank:3, word:'109项重大工程项目里有哪些机会', hotValue:11689000, tag:'新'},
+    {rank:4, word:'武汉的城市规模有多庞大', hotValue:11624000, tag:'热'},
+    {rank:5, word:'被喀麦隆标为省份台当局破防', hotValue:10337000, tag:''},
+    {rank:6, word:'美国财长劝民众接受油价暴涨', hotValue:10194000, tag:''},
+    {rank:7, word:'我国成功发射微厘空间02组卫星', hotValue:9106000, tag:''},
+    {rank:8, word:'郑钦文闯入迈阿密赛16强', hotValue:8866000, tag:''},
+    {rank:9, word:'华为春季发布会', hotValue:7793000, tag:''},
+    {rank:10, word:'成都警方辟谣崇州命案', hotValue:7791000, tag:'辟谣'},
+    {rank:11, word:'跟洛克王国再跳魔法城堡', hotValue:7781000, tag:'挑战'},
+    {rank:12, word:'白日提灯质感好能打', hotValue:7781000, tag:'首发'},
+    {rank:13, word:'玉簟秋杀青', hotValue:7778000, tag:'热'},
+    {rank:14, word:'盘点逐玉穿帮镜头', hotValue:7772000, tag:'新'},
+    {rank:15, word:'秦皇岛乔氏杯总决赛正赛阶段', hotValue:7760000, tag:''},
+  ],
+  entertain: [
+    {rank:1,word:'玉簟秋杀青',hotValue:7778000,tag:'热'},
+    {rank:2,word:'盘点逐玉穿帮镜头',hotValue:7772000,tag:'新'},
+    {rank:3,word:'跟洛克王国再跳魔法城堡',hotValue:7781000,tag:'挑战'},
+    {rank:4,word:'白日提灯质感好能打',hotValue:7781000,tag:'首发'},
+  ],
+  society: [
+    {rank:1,word:'武汉的城市规模有多庞大',hotValue:11624000,tag:'热'},
+    {rank:2,word:'被喀麦隆标为省份台当局破防',hotValue:10337000,tag:''},
+    {rank:3,word:'成都警方辟谣崇州命案',hotValue:7791000,tag:'辟谣'},
+  ],
+  finance: [
+    {rank:1,word:'3月23日24时油价上调',hotValue:12108000,tag:'新'},
+    {rank:2,word:'美国财长劝民众接受油价暴涨',hotValue:10194000,tag:''},
+    {rank:3,word:'109项重大工程项目里有哪些机会',hotValue:11689000,tag:'新'},
+  ],
+  sports: [
+    {rank:1,word:'郑钦文闯入迈阿密赛16强',hotValue:8866000,tag:''},
+    {rank:2,word:'秦皇岛乔氏杯总决赛正赛阶段',hotValue:7760000,tag:''},
+  ],
+  tech: [
+    {rank:1,word:'我国成功发射微厘空间02组卫星',hotValue:9106000,tag:''},
+    {rank:2,word:'华为春季发布会',hotValue:7793000,tag:''},
+    {rank:3,word:'大疆起诉影石',hotValue:11772000,tag:'热'},
+  ],
+};
+
+function fmtHotValue(v) {
+  if (!v) return '--';
+  if (v >= 1e8) return (v/1e8).toFixed(1)+'亿';
+  if (v >= 1e4) return (v/1e4).toFixed(1)+'万';
+  return String(v);
+}
+
+function renderHotlist(items, tab) {
+  const body = document.getElementById('hotlistBody');
+  const countEl = document.getElementById('hotlistCount');
+  if (!items || items.length === 0) {
+    body.innerHTML = `<div style="padding:40px 20px;text-align:center;color:var(--muted);font-size:13px;"><div style="font-size:28px;margin-bottom:10px;opacity:0.4;">🔍</div>暂无${tab}数据</div>`;
+    if (countEl) countEl.textContent = '0 条';
+    return;
+  }
+  if (countEl) countEl.textContent = items.length + ' 条热点';
+
+  // 给热榜词打分对比TRACKS热度
+  body.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;">
+      ${items.map((item, i) => {
+        const rankCls = i===0?'color:var(--gold);font-weight:800;':i===1?'color:#94a3b8;font-weight:700;':i===2?'color:#cd643c;font-weight:700;':'color:var(--muted);';
+        const heatWidth = Math.max(10, Math.min(100, Math.round((item.hotValue||0)/130000)));
+        const tagMap = {'新':'background:rgba(255,51,85,0.12);color:var(--accent);border:1px solid rgba(255,51,85,0.3);',
+                        '热':'background:rgba(245,158,11,0.12);color:var(--gold);border:1px solid rgba(245,158,11,0.3);',
+                        '辟谣':'background:rgba(124,58,237,0.12);color:#a78bfa;border:1px solid rgba(124,58,237,0.3);',
+                        '挑战':'background:rgba(16,185,129,0.12);color:var(--green);border:1px solid rgba(16,185,129,0.3);',
+                        '首发':'background:rgba(0,212,255,0.12);color:var(--accent2);border:1px solid rgba(0,212,255,0.3);'};
+        const tagStyle = tagMap[item.tag] || '';
+        const tagHtml = item.tag ? `<span style="font-size:8px;padding:1px 5px;border-radius:3px;font-family:'IBM Plex Mono',monospace;${tagStyle}">${item.tag}</span>` : '';
+        return `
+          <div onclick="hotlistItemClick('${item.word.replace(/'/g,"\\'")}',this)"
+            style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid rgba(42,45,62,0.5);cursor:pointer;transition:background 0.13s;${i%2===1?'border-left:1px solid rgba(42,45,62,0.5);':''}"
+            onmouseover="this.style.background='rgba(255,51,85,0.05)'" onmouseout="this.style.background='transparent'">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;min-width:20px;text-align:right;${rankCls}">${item.rank}</span>
+            <div style="flex:1;min-width:0;">
+              <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px;">
+                <span style="font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px;">${item.word}</span>
+                ${tagHtml}
+              </div>
+              <div style="height:2px;background:var(--surface3);border-radius:2px;overflow:hidden;">
+                <div style="height:100%;width:${heatWidth}%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:2px;"></div>
+              </div>
+            </div>
+            <span style="font-size:10px;color:var(--muted);font-family:'IBM Plex Mono',monospace;white-space:nowrap;flex-shrink:0;">${fmtHotValue(item.hotValue)}</span>
+          </div>`;
+      }).join('')}
+    </div>`;
+}
+
+function hotlistItemClick(word, el) {
+  // 视觉反馈
+  el.style.background = 'rgba(255,51,85,0.12)';
+  setTimeout(()=>{ el.style.background='transparent'; },600);
+
+  // 如果已在TRACKS里就直接选中；否则添加为自定义赛道
+  const existing = TRACKS.find(t => t.name === word || word.includes(t.name) || t.name.includes(word));
+  if (existing) {
+    // 选中对应track card
+    document.querySelectorAll('.track-card').forEach(c => {
+      if (c.dataset.name === existing.name) {
+        if (!selectedTracks.includes(existing.name)) {
+          c.click();
+        }
+      }
+    });
+    showToast(`✅ 已选中赛道「${existing.name}」`);
+  } else {
+    // 添加为自定义赛道
+    if (TRACKS.find(t => t.name === word)) {
+      showToast('该赛道已存在');
+      return;
+    }
+    if (selectedTracks.length >= 5) {
+      showToast('最多选择5个赛道，请先取消已选赛道');
+      return;
+    }
+    const colors = ['#ff3355','#00d4ff','#7c3aed','#f59e0b','#10b981','#fb923c'];
+    const color = colors[TRACKS.length % colors.length];
+    const heat = Math.floor(70 + Math.random()*25);
+    TRACKS.push({name: word, emoji:'🔥', heat, color});
+    // 重新渲染并选中
+    renderTrackGrid();
+    selectedTracks.forEach(t => {
+      document.querySelectorAll('.track-card').forEach(c => {
+        if (c.dataset.name === t) c.classList.add('selected');
+      });
+    });
+    // 选中新赛道
+    selectedTracks.push(word);
+    document.querySelectorAll('.track-card').forEach(c => {
+      if (c.dataset.name === word) c.classList.add('selected');
+    });
+    updateSelectedBar();
+    updateCompare();
+    showToast(`🔥 已将「${word}」添加为监测赛道！`);
+  }
+}
+
+function setHotlistTab(tab, el) {
+  _hotlistCurrentTab = tab;
+  // Update tab styles
+  document.querySelectorAll('.hotlist-tab').forEach(btn => {
+    btn.style.color = 'var(--muted)';
+    btn.style.borderBottom = '2px solid transparent';
+    btn.style.fontWeight = '500';
+  });
+  el.style.color = 'var(--accent)';
+  el.style.borderBottom = '2px solid var(--accent)';
+  el.style.fontWeight = '600';
+
+  const items = _hotlistData[tab];
+  if (items) {
+    renderHotlist(items, tab);
+  } else {
+    // Try to filter from 'hot' raw data if available
+    const rawHot = _hotlistData['_raw'] || [];
+    if (rawHot.length > 0) {
+      const filterFn = HOTLIST_CATEGORY_FILTERS[tab] || (() => true);
+      const filtered = rawHot.filter(item => filterFn(item.word || ''));
+      _hotlistData[tab] = filtered.length > 0 ? filtered : rawHot.slice(0, 5);
+      renderHotlist(_hotlistData[tab], tab);
+    } else {
+      // Use demo
+      const demo = HOTLIST_DEMO[tab] || HOTLIST_DEMO.hot.slice(0,5);
+      renderHotlist(demo, tab);
+    }
+  }
+}
+
+async function fetchHotListForTrack() {
+  const btn = document.getElementById('hotlistRefreshBtn');
+  if (btn) { btn.textContent = '⟳ 同步中…'; btn.style.opacity='0.6'; btn.style.pointerEvents='none'; }
+  const timeEl = document.getElementById('hotlistTime');
+  const body = document.getElementById('hotlistBody');
+
+  body.innerHTML = `<div style="padding:40px 20px;text-align:center;color:var(--muted);font-size:13px;">
+    <div style="font-size:28px;margin-bottom:10px;animation:spin 0.8s linear infinite;display:inline-block;">⟳</div><br>
+    正在与抖音平台同步热榜数据…
+  </div>`;
+
+  const key = localStorage.getItem('tikhub_key') || localStorage.getItem('ds_key') || _dsKey;
+  let success = false;
+
+  if (key && key.length > 10 && !key.startsWith('sk-ant-')) {
+    // TikHub key: use real hot search API
+    try {
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(), 15000);
+      const r = await fetch('/api/tikhub?endpoint=hot_search', {
+        signal: controller.signal,
+        headers: { 'x-api-key': key }
+      });
+      if (r.ok) {
+        const j = await r.json();
+        if (j?.success && j.items?.length > 0) {
+          // Build raw list with rank
+          const raw = j.items.map((item, i) => ({
+            rank: i + 1,
+            word: item.word || '',
+            hotValue: item.hotValue || 0,
+            tag: item.tag || '',
+          })).filter(item => item.word);
+          _hotlistData['_raw'] = raw;
+          _hotlistData['hot'] = raw;
+          // Build category tabs by filtering
+          Object.keys(HOTLIST_CATEGORY_FILTERS).forEach(tab => {
+            if (tab === 'hot') return;
+            const filterFn = HOTLIST_CATEGORY_FILTERS[tab];
+            const filtered = raw.filter(item => filterFn(item.word));
+            _hotlistData[tab] = filtered.length > 0 ? filtered.map((x,i)=>({...x,rank:i+1})) : raw.slice(0,3).map((x,i)=>({...x,rank:i+1}));
+          });
+          success = true;
+          // Update badges
+          document.getElementById('hotlistSyncBadge').style.display = 'inline';
+          document.getElementById('hotlistDemoBadge').style.display = 'none';
+        }
+      }
+    } catch(e) {
+      console.warn('[Hotlist] fetch failed:', e.message);
+    }
+  }
+
+  if (!success) {
+    // Fall back to demo data
+    Object.assign(_hotlistData, HOTLIST_DEMO);
+    document.getElementById('hotlistSyncBadge').style.display = 'none';
+    document.getElementById('hotlistDemoBadge').style.display = 'inline';
+  }
+
+  // Render current tab
+  renderHotlist(_hotlistData[_hotlistCurrentTab] || [], _hotlistCurrentTab);
+  if (timeEl) {
+    const now = new Date();
+    timeEl.textContent = `更新于 ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
+  }
+
+  if (btn) { btn.textContent = '↻ 刷新热榜'; btn.style.opacity='1'; btn.style.pointerEvents='auto'; }
+  _hotlistLoaded = true;
+}
+
+// ════════════════════════════════════════════════════════
 
 // 初始化赛道网格
 renderTrackGrid();

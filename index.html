@@ -180,7 +180,7 @@ header {
   font-family:'IBM Plex Mono',monospace;letter-spacing:1px;
 }
 
-.feed-list{max-height:480px;overflow-y:auto;}
+.feed-list{max-height:640px;overflow-y:auto;}
 .feed-list::-webkit-scrollbar{width:3px;}
 .feed-list::-webkit-scrollbar-track{background:transparent;}
 .feed-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
@@ -726,7 +726,7 @@ header {
         <button class="hotlist-tab" onclick="setHotlistTab('tech',this)" style="padding:10px 18px;font-size:12px;font-weight:500;border:none;background:transparent;color:var(--muted);cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent;font-family:'Noto Sans SC',sans-serif;">🔬 科技</button>
       </div>
       <!-- 列表区 -->
-      <div id="hotlistBody" style="max-height:420px;overflow-y:auto;">
+      <div id="hotlistBody" style="max-height:600px;overflow-y:auto;">
         <div style="padding:40px 20px;text-align:center;color:var(--muted);font-size:13px;">
           <div style="font-size:28px;margin-bottom:10px;opacity:0.4;">🔥</div>
           正在加载热榜数据…
@@ -1961,6 +1961,60 @@ async function fetchHotSearch() {
   return j.items.map(item => ({ word: item.word || '', hotValue: item.hotValue || 0 }));
 }
 
+// 实时监测榜分页状态
+const _feedPageSize = 20;
+const _feedMaxItems = 50;
+let _feedShownCount = 0;
+let _feedFilteredData = [];
+
+function loadMoreFeed() {
+  const data = _feedFilteredData;
+  const shown = _feedShownCount;
+  const newShown = Math.min(shown + _feedPageSize, data.length);
+  _feedShownCount = newShown;
+
+  const list = document.getElementById('feedList');
+  const loadMoreEl = document.getElementById('feedLoadMoreBtn');
+
+  // Append new items to the list (before the load more button)
+  const newItems = data.slice(shown, newShown).map((v, localI) => {
+    const i = shown + localI;
+    const rankClass = i===0?'r1':i===1?'r2':i===2?'r3':'rn';
+    return `
+    <div class="feed-item" style="animation-delay:${localI*0.04}s" onclick="feedItemClick(${i})">
+      <div class="feed-rank ${rankClass}">${i+1}</div>
+      <div class="feed-thumb"><div class="feed-thumb-overlay"></div><span style="position:relative;font-size:20px">${v.emoji}</span></div>
+      <div class="feed-info">
+        <div class="feed-title">${v.title}</div>
+        <div class="feed-stats">
+          <span>❤️ ${v.likes}</span>
+          <span>💬 ${v.comments}</span>
+          <span>↗️ ${v.shares}</span>
+          <span style="color:var(--accent2)">📂 ${v.track}</span>
+        </div>
+        <div class="feed-heat">
+          <div class="heat-bar"><div class="heat-fill" style="width:${v.heat}%"></div></div>
+          <span class="heat-num">${v.heat}</span>
+        </div>
+      </div>
+      <div class="feed-right">
+        <span class="${v.trend==='+'?'trend-up':'trend-dn'}">${v.trend}${v.trendVal}%</span>
+        ${v.isNew?'<span class="new-tag">NEW</span>':''}
+      </div>
+    </div>`;
+  }).join('');
+
+  if (loadMoreEl) {
+    loadMoreEl.insertAdjacentHTML('beforebegin', newItems);
+    const remaining = data.length - newShown;
+    if (remaining <= 0) {
+      loadMoreEl.style.display = 'none';
+    } else {
+      loadMoreEl.querySelector('span').textContent = `加载更多（还有 ${remaining} 条）▾`;
+    }
+  }
+}
+
 function renderFeed(isFirst) {
   const list = document.getElementById('feedList');
   let data = [...feedData];
@@ -1974,7 +2028,13 @@ function renderFeed(isFirst) {
     return;
   }
 
-  list.innerHTML = data.map((v, i) => {
+  // 最多展示50条
+  const capped = data.slice(0, _feedMaxItems);
+  _feedFilteredData = capped;
+  const initialCount = Math.min(_feedPageSize, capped.length);
+  _feedShownCount = initialCount;
+
+  const initialItems = capped.slice(0, initialCount).map((v, i) => {
     const rankClass = i===0?'r1':i===1?'r2':i===2?'r3':'rn';
     const isAnimNew = !isFirst && v.isNew;
     return `
@@ -2000,6 +2060,20 @@ function renderFeed(isFirst) {
       </div>
     </div>`;
   }).join('');
+
+  const remaining = capped.length - initialCount;
+  const loadMoreHtml = remaining > 0
+    ? `<div id="feedLoadMoreBtn" onclick="loadMoreFeed()"
+        style="padding:12px 20px;text-align:center;cursor:pointer;border-top:1px solid var(--border);
+               background:var(--surface2);transition:background 0.15s;"
+        onmouseover="this.style.background='rgba(255,51,85,0.08)'" onmouseout="this.style.background='var(--surface2)'">
+        <span style="font-size:12px;color:var(--accent);font-weight:600;font-family:'Noto Sans SC',sans-serif;letter-spacing:0.5px;">
+          加载更多（还有 ${remaining} 条）▾
+        </span>
+      </div>`
+    : '';
+
+  list.innerHTML = initialItems + loadMoreHtml;
 }
 
 function feedItemClick(idx) {
@@ -3082,6 +3156,73 @@ function fmtHotValue(v) {
   return String(v);
 }
 
+// 热榜分页状态
+const _hotlistPageSize = 20;
+const _hotlistMaxItems = 50;
+let _hotlistShownCount = {};
+
+function _renderHotlistItems(items, startIdx, endIdx) {
+  const tagMap = {'新':'background:rgba(255,51,85,0.12);color:var(--accent);border:1px solid rgba(255,51,85,0.3);',
+                  '热':'background:rgba(245,158,11,0.12);color:var(--gold);border:1px solid rgba(245,158,11,0.3);',
+                  '辟谣':'background:rgba(124,58,237,0.12);color:#a78bfa;border:1px solid rgba(124,58,237,0.3);',
+                  '挑战':'background:rgba(16,185,129,0.12);color:var(--green);border:1px solid rgba(16,185,129,0.3);',
+                  '首发':'background:rgba(0,212,255,0.12);color:var(--accent2);border:1px solid rgba(0,212,255,0.3);'};
+  return items.slice(startIdx, endIdx).map((item, localI) => {
+    const i = startIdx + localI;
+    const rankCls = i===0?'color:var(--gold);font-weight:800;':i===1?'color:#94a3b8;font-weight:700;':i===2?'color:#cd643c;font-weight:700;':'color:var(--muted);';
+    const heatWidth = Math.max(10, Math.min(100, Math.round((item.hotValue||0)/130000)));
+    const tagStyle = tagMap[item.tag] || '';
+    const tagHtml = item.tag ? `<span style="font-size:8px;padding:1px 5px;border-radius:3px;font-family:'IBM Plex Mono',monospace;${tagStyle}">${item.tag}</span>` : '';
+    return `
+      <div onclick="hotlistItemClick('${item.word.replace(/'/g,"\\'")}',this)"
+        style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid rgba(42,45,62,0.5);cursor:pointer;transition:background 0.13s;${i%2===1?'border-left:1px solid rgba(42,45,62,0.5);':''}"
+        onmouseover="this.style.background='rgba(255,51,85,0.05)'" onmouseout="this.style.background='transparent'">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;min-width:20px;text-align:right;${rankCls}">${item.rank}</span>
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px;">
+            <span style="font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px;">${item.word}</span>
+            ${tagHtml}
+          </div>
+          <div style="height:2px;background:var(--surface3);border-radius:2px;overflow:hidden;">
+            <div style="height:100%;width:${heatWidth}%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:2px;"></div>
+          </div>
+        </div>
+        <span style="font-size:10px;color:var(--muted);font-family:'IBM Plex Mono',monospace;white-space:nowrap;flex-shrink:0;">${fmtHotValue(item.hotValue)}</span>
+      </div>`;
+  }).join('');
+}
+
+function loadMoreHotlist() {
+  const tab = _hotlistCurrentTab;
+  const items = (_hotlistData[tab] || []).slice(0, _hotlistMaxItems);
+  const shown = _hotlistShownCount[tab] || _hotlistPageSize;
+  const newShown = Math.min(shown + _hotlistPageSize, items.length);
+  _hotlistShownCount[tab] = newShown;
+
+  const grid = document.getElementById('hotlistGrid');
+  if (grid) {
+    // Append new items
+    const newHtml = _renderHotlistItems(items, shown, newShown);
+    const temp = document.createElement('div');
+    temp.innerHTML = newHtml;
+    while (temp.firstChild) grid.appendChild(temp.firstChild);
+  }
+
+  // Update or remove load more button
+  const btn = document.getElementById('hotlistLoadMoreBtn');
+  if (btn) {
+    const remaining = items.length - newShown;
+    if (remaining <= 0) {
+      btn.style.display = 'none';
+    } else {
+      btn.textContent = `加载更多（还有 ${remaining} 条）`;
+    }
+  }
+  // Update count display
+  const countEl = document.getElementById('hotlistCount');
+  if (countEl) countEl.textContent = `显示 ${newShown} / ${items.length} 条`;
+}
+
 function renderHotlist(items, tab) {
   const body = document.getElementById('hotlistBody');
   const countEl = document.getElementById('hotlistCount');
@@ -3090,39 +3231,31 @@ function renderHotlist(items, tab) {
     if (countEl) countEl.textContent = '0 条';
     return;
   }
-  if (countEl) countEl.textContent = items.length + ' 条热点';
+
+  // 最多展示50条
+  const capped = items.slice(0, _hotlistMaxItems);
+  const initialCount = Math.min(_hotlistPageSize, capped.length);
+  _hotlistShownCount[tab] = initialCount;
+
+  if (countEl) countEl.textContent = `显示 ${initialCount} / ${capped.length} 条`;
+
+  const remaining = capped.length - initialCount;
+  const loadMoreHtml = remaining > 0
+    ? `<div id="hotlistLoadMoreBtn" onclick="loadMoreHotlist()"
+        style="padding:12px;text-align:center;cursor:pointer;font-size:12px;color:var(--accent);font-weight:600;
+               border-top:1px solid var(--border);background:var(--surface2);transition:background 0.15s;
+               font-family:'Noto Sans SC',sans-serif;letter-spacing:0.5px;"
+        onmouseover="this.style.background='rgba(255,51,85,0.08)'" onmouseout="this.style.background='var(--surface2)'">
+        加载更多（还有 ${remaining} 条）▾
+      </div>`
+    : '';
 
   // 给热榜词打分对比TRACKS热度
   body.innerHTML = `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;">
-      ${items.map((item, i) => {
-        const rankCls = i===0?'color:var(--gold);font-weight:800;':i===1?'color:#94a3b8;font-weight:700;':i===2?'color:#cd643c;font-weight:700;':'color:var(--muted);';
-        const heatWidth = Math.max(10, Math.min(100, Math.round((item.hotValue||0)/130000)));
-        const tagMap = {'新':'background:rgba(255,51,85,0.12);color:var(--accent);border:1px solid rgba(255,51,85,0.3);',
-                        '热':'background:rgba(245,158,11,0.12);color:var(--gold);border:1px solid rgba(245,158,11,0.3);',
-                        '辟谣':'background:rgba(124,58,237,0.12);color:#a78bfa;border:1px solid rgba(124,58,237,0.3);',
-                        '挑战':'background:rgba(16,185,129,0.12);color:var(--green);border:1px solid rgba(16,185,129,0.3);',
-                        '首发':'background:rgba(0,212,255,0.12);color:var(--accent2);border:1px solid rgba(0,212,255,0.3);'};
-        const tagStyle = tagMap[item.tag] || '';
-        const tagHtml = item.tag ? `<span style="font-size:8px;padding:1px 5px;border-radius:3px;font-family:'IBM Plex Mono',monospace;${tagStyle}">${item.tag}</span>` : '';
-        return `
-          <div onclick="hotlistItemClick('${item.word.replace(/'/g,"\\'")}',this)"
-            style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid rgba(42,45,62,0.5);cursor:pointer;transition:background 0.13s;${i%2===1?'border-left:1px solid rgba(42,45,62,0.5);':''}"
-            onmouseover="this.style.background='rgba(255,51,85,0.05)'" onmouseout="this.style.background='transparent'">
-            <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;min-width:20px;text-align:right;${rankCls}">${item.rank}</span>
-            <div style="flex:1;min-width:0;">
-              <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px;">
-                <span style="font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px;">${item.word}</span>
-                ${tagHtml}
-              </div>
-              <div style="height:2px;background:var(--surface3);border-radius:2px;overflow:hidden;">
-                <div style="height:100%;width:${heatWidth}%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:2px;"></div>
-              </div>
-            </div>
-            <span style="font-size:10px;color:var(--muted);font-family:'IBM Plex Mono',monospace;white-space:nowrap;flex-shrink:0;">${fmtHotValue(item.hotValue)}</span>
-          </div>`;
-      }).join('')}
-    </div>`;
+    <div id="hotlistGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:0;">
+      ${_renderHotlistItems(capped, 0, initialCount)}
+    </div>
+    ${loadMoreHtml}`;
 }
 
 function hotlistItemClick(word, el) {
